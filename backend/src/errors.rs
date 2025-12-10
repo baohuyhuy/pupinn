@@ -29,6 +29,9 @@ pub enum AppError {
     #[error("Invalid status transition: {0}")]
     InvalidStatusTransition(String),
 
+    #[error("Conflict: {0}")]
+    Conflict(String),
+
     #[error("Database error: {0}")]
     DatabaseError(String),
 
@@ -49,24 +52,19 @@ impl IntoResponse for AppError {
             AppError::ValidationError(msg) => {
                 (StatusCode::BAD_REQUEST, "VALIDATION_ERROR", msg.clone())
             }
-            AppError::Unauthorized(msg) => {
-                (StatusCode::UNAUTHORIZED, "UNAUTHORIZED", msg.clone())
-            }
-            AppError::Forbidden(msg) => {
-                (StatusCode::FORBIDDEN, "FORBIDDEN", msg.clone())
-            }
-            AppError::NotFound(msg) => {
-                (StatusCode::NOT_FOUND, "NOT_FOUND", msg.clone())
-            }
+            AppError::Unauthorized(msg) => (StatusCode::UNAUTHORIZED, "UNAUTHORIZED", msg.clone()),
+            AppError::Forbidden(msg) => (StatusCode::FORBIDDEN, "FORBIDDEN", msg.clone()),
+            AppError::NotFound(msg) => (StatusCode::NOT_FOUND, "NOT_FOUND", msg.clone()),
             AppError::RoomUnavailable(msg) => {
                 (StatusCode::CONFLICT, "ROOM_UNAVAILABLE", msg.clone())
             }
-            AppError::DuplicateRoom(msg) => {
-                (StatusCode::CONFLICT, "DUPLICATE_ROOM", msg.clone())
-            }
-            AppError::InvalidStatusTransition(msg) => {
-                (StatusCode::CONFLICT, "INVALID_STATUS_TRANSITION", msg.clone())
-            }
+            AppError::DuplicateRoom(msg) => (StatusCode::CONFLICT, "DUPLICATE_ROOM", msg.clone()),
+            AppError::InvalidStatusTransition(msg) => (
+                StatusCode::CONFLICT,
+                "INVALID_STATUS_TRANSITION",
+                msg.clone(),
+            ),
+            AppError::Conflict(msg) => (StatusCode::CONFLICT, "CONFLICT", msg.clone()),
             AppError::DatabaseError(msg) => {
                 tracing::error!("Database error: {}", msg);
                 (
@@ -97,9 +95,7 @@ impl IntoResponse for AppError {
 impl From<diesel::result::Error> for AppError {
     fn from(err: diesel::result::Error) -> Self {
         match err {
-            diesel::result::Error::NotFound => {
-                AppError::NotFound("Resource not found".to_string())
-            }
+            diesel::result::Error::NotFound => AppError::NotFound("Resource not found".to_string()),
             _ => AppError::DatabaseError(err.to_string()),
         }
     }
@@ -119,4 +115,3 @@ impl From<argon2::password_hash::Error> for AppError {
 
 /// Result type alias for AppError
 pub type AppResult<T> = Result<T, AppError>;
-

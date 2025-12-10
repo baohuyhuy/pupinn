@@ -183,6 +183,8 @@ impl BookingService {
             room_id,
             check_in_date,
             check_out_date,
+            created_by_user_id: None,
+            creation_source: "staff",
         };
 
         diesel::insert_into(bookings::table)
@@ -407,6 +409,210 @@ impl BookingService {
                 "Cannot cancel booking with status {:?}. Only upcoming bookings can be cancelled.",
                 booking.status
             )));
+        }
+
+        // Update booking status
+        let update = UpdateBooking {
+            status: Some(BookingStatus::Cancelled),
+            ..Default::default()
+        };
+
+        diesel::update(bookings::table.find(booking_id))
+            .set(&update)
+            .get_result(&mut conn)
+            .map_err(|e| AppError::DatabaseError(e.to_string()))
+    }
+
+    /// Create a new booking for a guest user
+    ///
+    /// This method is used when a guest creates a booking through the guest portal.
+    /// The guest's user_id is recorded, and the guest's name is used from their account.
+    ///
+    /// # Arguments
+    /// * `user_id` - The UUID of the guest user creating the booking
+    /// * `guest_name` - The name to use for the booking (typically the guest's full name)
+    /// * `room_id` - The room to book
+    /// * `check_in_date` - Check-in date
+    /// * `check_out_date` - Check-out date
+    pub fn create_guest_booking(
+        &self,
+        user_id: Uuid,
+        guest_name: &str,
+        room_id: Uuid,
+        check_in_date: NaiveDate,
+        check_out_date: NaiveDate,
+    ) -> AppResult<BookingWithRoom> {
+        // Validate dates
+        self.validate_dates(check_in_date, check_out_date)?;
+
+        // Check room exists and get its info
+        let mut conn = self
+            .pool
+            .get()
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        let room: Room = rooms::table
+            .find(room_id)
+            .first(&mut conn)
+            .map_err(|_| AppError::NotFound(format!("Room with ID '{}' not found", room_id)))?;
+
+        // Check room is not under maintenance
+        if room.status == RoomStatus::Maintenance {
+            return Err(AppError::RoomUnavailable(format!(
+                "Room {} is under maintenance",
+                room.number
+            )));
+        }
+
+        // Check availability
+        if !self.check_availability(room_id, check_in_date, check_out_date, None)? {
+            return Err(AppError::RoomUnavailable(format!(
+                "Room {} is not available for the selected dates",
+                room.number
+            )));
+        }
+
+        // Generate reference
+        let reference = self.generate_reference()?;
+
+        // Validate guest name
+        if guest_name.trim().is_empty() {
+            return Err(AppError::ValidationError(
+                "Guest name is required".to_string(),
+            ));
+        }
+
+        if guest_name.len() > 100 {
+            return Err(AppError::ValidationError(
+                "Guest name must be 100 characters or less".to_string(),
+            ));
+        }
+
+        let new_booking = NewBooking {
+            reference: &reference,
+            guest_name: guest_name.trim(),
+            room_id,
+            check_in_date,
+            check_out_date,
+            created_by_user_id: Some(user_id),
+            creation_source: "guest",
+        };
+
+        let booking: Booking = diesel::insert_into(bookings::table)
+            .values(&new_booking)
+            .get_result(&mut conn)
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        Ok(BookingWithRoom {
+            booking,
+            room: Some(room),
+        })
+    }
+
+    /// List bookings for a specific user (guest)
+    ///
+    /// Returns all bookings created by the specified user, ordered by check-in date.
+    ///
+    /// # Arguments
+    /// * `user_id` - The UUID of the user whose bookings to list
+    /// * `status_filter` - Optional status filter
+    pub fn list_bookings_by_user(
+        &self,
+        user_id: Uuid,
+        status_filter: Option<BookingStatus>,
+    ) -> AppResult<Vec<BookingWithRoom>> {
+        let mut conn = self
+            .pool
+            .get()
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        let mut query = bookings::table
+            .filter(bookings::created_by_user_id.eq(user_id))
+            .into_boxed();
+
+        if let Some(status) = status_filter {
+            query = query.filter(bookings::status.eq(status));
+        }
+
+        let booking_list: Vec<Booking> = query
+            .order(bookings::check_in_date.desc())
+            .load(&mut conn)
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        // Load rooms for all bookings
+        let room_ids: Vec<Uuid> = booking_list.iter().map(|b| b.room_id).collect();
+        let rooms_list: Vec<Room> = rooms::table
+            .filter(rooms::id.eq_any(&room_ids))
+            .load(&mut conn)
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        // Map rooms to bookings
+        let result: Vec<BookingWithRoom> = booking_list
+            .into_iter()
+            .map(|booking| {
+                let room = rooms_list.iter().find(|r| r.id == booking.room_id).cloned();
+                BookingWithRoom { booking, room }
+            })
+            .collect();
+
+        Ok(result)
+    }
+
+    /// Get a booking by ID with ownership check
+    ///
+    /// Returns the booking only if it belongs to the specified user.
+    ///
+    /// # Arguments
+    /// * `booking_id` - The booking ID
+    /// * `user_id` - The user ID to verify ownership
+    pub fn get_guest_booking(
+        &self,
+        booking_id: Uuid,
+        user_id: Uuid,
+    ) -> AppResult<BookingWithRoom> {
+        let booking_with_room = self.get_booking_with_room(booking_id)?;
+
+        // Verify ownership
+        if booking_with_room.booking.created_by_user_id != Some(user_id) {
+            return Err(AppError::NotFound("Booking not found".to_string()));
+        }
+
+        Ok(booking_with_room)
+    }
+
+    /// Cancel a guest booking with ownership check
+    ///
+    /// Cancels the booking only if it belongs to the specified user and is in "upcoming" status.
+    ///
+    /// # Arguments
+    /// * `booking_id` - The booking ID
+    /// * `user_id` - The user ID to verify ownership
+    pub fn cancel_guest_booking(
+        &self,
+        booking_id: Uuid,
+        user_id: Uuid,
+    ) -> AppResult<Booking> {
+        let mut conn = self
+            .pool
+            .get()
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        let booking: Booking =
+            bookings::table
+                .find(booking_id)
+                .first(&mut conn)
+                .map_err(|_| AppError::NotFound("Booking not found".to_string()))?;
+
+        // Verify ownership
+        if booking.created_by_user_id != Some(user_id) {
+            return Err(AppError::NotFound("Booking not found".to_string()));
+        }
+
+        // Validate status - only upcoming bookings can be cancelled
+        if booking.status != BookingStatus::Upcoming {
+            return Err(AppError::InvalidStatusTransition(
+                "Only upcoming bookings can be cancelled".to_string(),
+            ));
         }
 
         // Update booking status

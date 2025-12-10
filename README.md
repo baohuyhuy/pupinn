@@ -18,8 +18,15 @@ A modern hotel management system built as a student project for an Introduction 
 - **Dashboard**: Today's arrivals, departures, and room availability stats
 
 ### User Roles
-- **Receptionist**: Book rooms, check-in/out guests, view bookings
+- **Guest**: Self-register, login, search rooms, book rooms, view/cancel own bookings
+- **Receptionist**: Book rooms, check-in/out guests, view all bookings
 - **Admin**: All receptionist permissions + room management
+
+### Guest Self-Service Portal
+- **Registration**: Guests can create accounts with email, password, and name
+- **Room Search**: Search available rooms by date range and room type
+- **Self-Booking**: Book rooms directly without staff assistance
+- **Booking Management**: View own bookings and cancel upcoming reservations
 
 ## 🚀 Quick Start
 
@@ -83,11 +90,22 @@ pnpm dev
 
 Open http://localhost:3000 in your browser.
 
-**Default Credentials:**
+**Portal URLs:**
+| Portal          | URL                               | Description            |
+| --------------- | --------------------------------- | ---------------------- |
+| Guest Login     | http://localhost:3000/login       | Guest sign in/register |
+| Staff Login     | http://localhost:3000/staff/login | Staff portal           |
+| Guest Dashboard | http://localhost:3000/guest       | Guest booking area     |
+| Staff Dashboard | http://localhost:3000             | Staff management area  |
+
+**Staff Credentials:**
 | Username  | Password     | Role         |
 | --------- | ------------ | ------------ |
 | admin     | admin123     | Admin        |
 | reception | reception123 | Receptionist |
+
+**Guest Registration:**
+Guests can self-register at `/register` with email, password, and full name.
 
 ## 📁 Project Structure
 
@@ -127,10 +145,15 @@ pnpm build
 
 ## 📖 API Endpoints
 
-### Authentication
-- `POST /auth/login` - Login with username/password
-- `GET /auth/me` - Get current user info
-- `POST /auth/users` - Create new user (admin only)
+### Staff Authentication
+- `POST /auth/login` - Staff login with username/password
+- `GET /auth/me` - Get current staff user info
+- `POST /auth/users` - Create new staff user (admin only)
+
+### Guest Authentication
+- `POST /auth/register` - Register new guest account
+- `POST /auth/guest/login` - Guest login with email/password
+- `GET /auth/guest/me` - Get current guest user info
 
 ### Rooms
 - `GET /rooms` - List all rooms (with optional filters)
@@ -139,14 +162,20 @@ pnpm build
 - `PATCH /rooms/:id` - Update room (admin only)
 - `GET /rooms/available` - Get available rooms for date range
 
-### Bookings
-- `GET /bookings` - List bookings (with filters)
+### Staff Bookings
+- `GET /bookings` - List all bookings (with filters)
 - `GET /bookings/:id` - Get booking by ID
 - `GET /bookings/reference/:ref` - Get booking by reference
-- `POST /bookings` - Create new booking
+- `POST /bookings` - Create new booking (staff)
 - `POST /bookings/:id/check-in` - Check in guest
 - `POST /bookings/:id/check-out` - Check out guest
 - `POST /bookings/:id/cancel` - Cancel booking
+
+### Guest Bookings
+- `GET /guest/bookings` - List own bookings (requires guest auth)
+- `GET /guest/bookings/:id` - Get own booking by ID
+- `POST /guest/bookings` - Create new booking (guest)
+- `POST /guest/bookings/:id/cancel` - Cancel own upcoming booking
 
 ## 🎓 Course Context
 

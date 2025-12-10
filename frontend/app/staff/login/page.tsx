@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,37 +16,34 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { getErrorMessage } from "@/lib/api-client";
-import { loginGuest } from "@/lib/guest-auth";
-import {
-  GuestLoginRequestSchema,
-  type GuestLoginRequest,
-} from "@/lib/validators";
 import { PawPrint, Building2 } from "lucide-react";
 import Link from "next/link";
 
-export default function GuestLoginPage() {
-  const router = useRouter();
+const loginSchema = z.object({
+  username: z.string().min(3, "Username must be at least 3 characters"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+});
+
+type LoginFormData = z.infer<typeof loginSchema>;
+
+export default function StaffLoginPage() {
+  const { login, isLoading } = useAuth();
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
 
   const {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<GuestLoginRequest>({
-    resolver: zodResolver(GuestLoginRequestSchema),
+  } = useForm<LoginFormData>({
+    resolver: zodResolver(loginSchema),
   });
 
-  const onSubmit = async (data: GuestLoginRequest) => {
+  const onSubmit = async (data: LoginFormData) => {
     setError(null);
-    setIsLoading(true);
     try {
-      await loginGuest(data);
-      router.push("/guest");
+      await login(data.username, data.password);
     } catch (err: unknown) {
       setError(getErrorMessage(err) || "Login failed. Please try again.");
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -55,14 +53,14 @@ export default function GuestLoginPage() {
 
       <Card className="w-full max-w-md relative z-10 bg-slate-800/80 backdrop-blur-sm border-slate-700 shadow-2xl">
         <CardHeader className="space-y-2 text-center">
-          <div className="mx-auto w-16 h-16 bg-linear-to-br from-amber-400 to-amber-600 rounded-2xl flex items-center justify-center mb-2 shadow-lg">
-            <PawPrint className="h-8 w-8 text-slate-900" />
+          <div className="mx-auto w-16 h-16 bg-linear-to-br from-blue-400 to-blue-600 rounded-2xl flex items-center justify-center mb-2 shadow-lg">
+            <Building2 className="h-8 w-8 text-white" />
           </div>
           <CardTitle className="text-2xl font-bold text-slate-100">
-            Welcome to Pupinn
+            Staff Portal
           </CardTitle>
           <CardDescription className="text-slate-400">
-            Sign in to manage your bookings
+            Sign in to access the hotel console
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -74,18 +72,20 @@ export default function GuestLoginPage() {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-slate-300">
-                Email
+              <Label htmlFor="username" className="text-slate-300">
+                Username
               </Label>
               <Input
-                id="email"
-                type="email"
-                placeholder="your@email.com"
-                className="bg-slate-700/50 border-slate-600 text-slate-100 placeholder:text-slate-500 focus:border-amber-500 focus:ring-amber-500/20"
-                {...register("email")}
+                id="username"
+                type="text"
+                placeholder="Enter your username"
+                className="bg-slate-700/50 border-slate-600 text-slate-100 placeholder:text-slate-500 focus:border-blue-500 focus:ring-blue-500/20"
+                {...register("username")}
               />
-              {errors.email && (
-                <p className="text-sm text-red-400">{errors.email.message}</p>
+              {errors.username && (
+                <p className="text-sm text-red-400">
+                  {errors.username.message}
+                </p>
               )}
             </div>
 
@@ -97,7 +97,7 @@ export default function GuestLoginPage() {
                 id="password"
                 type="password"
                 placeholder="Enter your password"
-                className="bg-slate-700/50 border-slate-600 text-slate-100 placeholder:text-slate-500 focus:border-amber-500 focus:ring-amber-500/20"
+                className="bg-slate-700/50 border-slate-600 text-slate-100 placeholder:text-slate-500 focus:border-blue-500 focus:ring-blue-500/20"
                 {...register("password")}
               />
               {errors.password && (
@@ -109,7 +109,7 @@ export default function GuestLoginPage() {
 
             <Button
               type="submit"
-              className="w-full bg-linear-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-900 font-semibold shadow-lg shadow-amber-500/25 transition-all duration-200"
+              className="w-full bg-linear-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-semibold shadow-lg shadow-blue-500/25 transition-all duration-200"
               disabled={isLoading}
             >
               {isLoading ? (
@@ -137,15 +137,10 @@ export default function GuestLoginPage() {
               )}
             </Button>
 
-            <div className="text-center text-sm">
+            <div className="text-center text-sm text-slate-500">
+              <p>Demo credentials:</p>
               <p className="text-slate-400">
-                Don&apos;t have an account?{" "}
-                <Link
-                  href="/register"
-                  className="text-amber-400 hover:text-amber-300 font-medium transition-colors"
-                >
-                  Register here
-                </Link>
+                admin / admin123 or reception / reception123
               </p>
             </div>
 
@@ -160,12 +155,12 @@ export default function GuestLoginPage() {
 
             <div className="text-center text-sm">
               <p className="text-slate-400">
-                Hotel staff?{" "}
+                Guest looking to book a room?{" "}
                 <Link
-                  href="/staff/login"
-                  className="text-blue-400 hover:text-blue-300 font-medium transition-colors"
+                  href="/login"
+                  className="text-amber-400 hover:text-amber-300 font-medium transition-colors"
                 >
-                  Staff portal
+                  Guest login
                 </Link>
               </p>
             </div>
@@ -173,14 +168,9 @@ export default function GuestLoginPage() {
         </CardContent>
       </Card>
 
-      <div className="fixed bottom-4 right-4 flex items-center gap-2 text-slate-500 text-sm">
-        <Building2 className="h-4 w-4" />
-        <Link
-          href="/staff/login"
-          className="hover:text-slate-400 transition-colors"
-        >
-          Staff Login
-        </Link>
+      <div className="fixed bottom-4 left-4 flex items-center gap-2 text-slate-500 text-sm">
+        <PawPrint className="h-4 w-4" />
+        <span>Pupinn Hotel Management</span>
       </div>
     </div>
   );

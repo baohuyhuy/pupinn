@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dialog";
 
 import { useAuth } from "@/components/auth-provider";
+import { RouteGuard } from "@/components/route-guard";
 import { BookingList, type BookingWithRoom } from "@/components/booking-list";
 import {
   BookingFilters,
@@ -219,7 +220,8 @@ export default function BookingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-slate-900 via-slate-800 to-slate-900 p-8">
+    <RouteGuard>
+      <div className="min-h-screen bg-linear-to-br from-slate-900 via-slate-800 to-slate-900 p-8">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
@@ -368,5 +370,6 @@ export default function BookingsPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </RouteGuard>
   );
 }

@@ -47,13 +47,14 @@ fn seed_users(conn: &mut PgConnection) {
             continue;
         }
 
-        let password_hash =
-            AuthService::hash_password(password).expect("Failed to hash password");
+        let password_hash = AuthService::hash_password(password).expect("Failed to hash password");
 
         let new_user = NewUser {
-            username,
+            username: Some(username),
             password_hash: &password_hash,
             role,
+            email: None,
+            full_name: None,
         };
 
         diesel::insert_into(users::table)
@@ -99,4 +100,3 @@ fn seed_rooms(conn: &mut PgConnection) {
         println!("  ✅ Created room '{}' ({:?})", number, room_type);
     }
 }
-

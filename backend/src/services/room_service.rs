@@ -60,6 +60,7 @@ impl RoomService {
     }
 
     /// Get a room by number
+    #[allow(dead_code)]
     pub fn get_room_by_number(&self, number: &str) -> AppResult<Room> {
         let mut conn = self
             .pool

@@ -1,6 +1,7 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api";
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api";
 
 // Create axios instance with default config
 export const apiClient = axios.create({
@@ -11,15 +12,27 @@ export const apiClient = axios.create({
   timeout: 10000,
 });
 
-const TOKEN_KEY = 'hms_token';
-const USER_KEY = 'hms_user';
+// Staff auth keys
+const TOKEN_KEY = "hms_token";
+const USER_KEY = "hms_user";
+
+// Guest auth keys
+const GUEST_TOKEN_KEY = "guest_token";
+const GUEST_USER_KEY = "guest_user";
 
 // Request interceptor to add JWT token
+// Checks for both staff and guest tokens
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    const token = typeof window !== "undefined" ? localStorage.getItem(TOKEN_KEY) : null;
-    if (token && config.headers) {
-      config.headers.Authorization = `Bearer ${token}`;
+    if (typeof window !== "undefined") {
+      // First check for staff token, then guest token
+      const staffToken = localStorage.getItem(TOKEN_KEY);
+      const guestToken = localStorage.getItem(GUEST_TOKEN_KEY);
+      const token = staffToken || guestToken;
+
+      if (token && config.headers) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
     }
     return config;
   },
@@ -33,13 +46,23 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error: AxiosError<{ code: string; message: string }>) => {
     if (error.response?.status === 401) {
-      // Clear token and redirect to login on unauthorized
+      // Clear tokens and redirect to login on unauthorized
       if (typeof window !== "undefined") {
+        // Clear both staff and guest tokens
         localStorage.removeItem(TOKEN_KEY);
         localStorage.removeItem(USER_KEY);
-        // Only redirect if not already on login page
-        if (!window.location.pathname.includes("/login")) {
-          window.location.href = "/login";
+        localStorage.removeItem(GUEST_TOKEN_KEY);
+        localStorage.removeItem(GUEST_USER_KEY);
+
+        // Only redirect if not already on login/register pages
+        const path = window.location.pathname;
+        if (!path.includes("/login") && !path.includes("/register")) {
+          // Redirect to appropriate login page based on current path
+          if (path.startsWith("/guest")) {
+            window.location.href = "/login";
+          } else {
+            window.location.href = "/staff/login";
+          }
         }
       }
     }
@@ -64,4 +87,3 @@ export function getErrorMessage(error: unknown): string {
   }
   return "An unexpected error occurred";
 }
-

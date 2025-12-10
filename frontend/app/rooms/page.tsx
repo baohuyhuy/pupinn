@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select";
 
 import { useAuth } from "@/components/auth-provider";
+import { RouteGuard } from "@/components/route-guard";
 import { RoomList } from "@/components/room-list";
 import { apiClient } from "@/lib/api-client";
 import { type Room } from "@/lib/validators";
@@ -76,7 +77,8 @@ export default function RoomsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-slate-900 via-slate-800 to-slate-900 p-8">
+    <RouteGuard>
+      <div className="min-h-screen bg-linear-to-br from-slate-900 via-slate-800 to-slate-900 p-8">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
@@ -190,5 +192,6 @@ export default function RoomsPage() {
         />
       </div>
     </div>
+    </RouteGuard>
   );
 }

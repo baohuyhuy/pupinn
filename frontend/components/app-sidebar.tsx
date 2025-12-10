@@ -12,6 +12,7 @@ import {
   BedDouble,
   Shield,
   PawPrint,
+  UserPlus,
 } from "lucide-react";
 
 import {
@@ -212,16 +213,29 @@ export function AppSidebar() {
                 <p className="text-xs text-amber-100/80 mb-3">
                   Sign in to manage bookings and rooms.
                 </p>
-                <Button
-                  asChild
-                  size="sm"
-                  className="w-full justify-center gap-2 bg-amber-500 text-slate-900 hover:bg-amber-400 cursor-pointer"
-                >
-                  <Link href="/login">
-                    <LogIn className="h-4 w-4" />
-                    <span>Sign in</span>
-                  </Link>
-                </Button>
+                <div className="space-y-2">
+                  <Button
+                    asChild
+                    size="sm"
+                    className="w-full justify-center gap-2 bg-amber-500 text-slate-900 hover:bg-amber-400 cursor-pointer"
+                  >
+                    <Link href="/login">
+                      <LogIn className="h-4 w-4" />
+                      <span>Staff sign in</span>
+                    </Link>
+                  </Button>
+                  <Button
+                    asChild
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-center gap-2 border border-white/10 text-white hover:bg-white/10 cursor-pointer"
+                  >
+                    <Link href="/register">
+                      <UserPlus className="h-4 w-4" />
+                      <span>Guest sign up</span>
+                    </Link>
+                  </Button>
+                </div>
               </div>
             )}
           </>

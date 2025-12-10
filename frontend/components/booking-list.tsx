@@ -28,6 +28,8 @@ export interface BookingWithRoom {
   status: BookingStatus;
   created_at: string;
   updated_at: string;
+  creation_source?: string;
+  created_by_user_id?: string | null;
   room: {
     id: string;
     number: string;
@@ -123,6 +125,7 @@ export function BookingList({
               <TableHead className="text-slate-400">Room</TableHead>
               <TableHead className="text-slate-400">Check-in</TableHead>
               <TableHead className="text-slate-400">Check-out</TableHead>
+              <TableHead className="text-slate-400">Source</TableHead>
               <TableHead className="text-slate-400">Status</TableHead>
               <TableHead className="text-slate-400">Actions</TableHead>
             </TableRow>
@@ -150,6 +153,18 @@ export function BookingList({
                 </TableCell>
                 <TableCell className="text-slate-300">
                   {format(new Date(booking.check_out_date), "MMM d, yyyy")}
+                </TableCell>
+                <TableCell>
+                  <Badge
+                    variant="outline"
+                    className={
+                      booking.creation_source === "guest"
+                        ? "border-amber-500/30 text-amber-400 bg-amber-500/10"
+                        : "border-blue-500/30 text-blue-400 bg-blue-500/10"
+                    }
+                  >
+                    {booking.creation_source === "guest" ? "Guest" : "Staff"}
+                  </Badge>
                 </TableCell>
                 <TableCell>{getStatusBadge(booking.status)}</TableCell>
                 <TableCell>

@@ -34,6 +34,9 @@ diesel::table! {
         status -> BookingStatus,
         created_at -> Timestamptz,
         updated_at -> Timestamptz,
+        created_by_user_id -> Nullable<Uuid>,
+        #[max_length = 10]
+        creation_source -> Varchar,
     }
 }
 
@@ -60,15 +63,20 @@ diesel::table! {
     users (id) {
         id -> Uuid,
         #[max_length = 50]
-        username -> Varchar,
+        username -> Nullable<Varchar>,
         #[max_length = 255]
         password_hash -> Varchar,
         role -> UserRole,
         created_at -> Timestamptz,
         updated_at -> Timestamptz,
+        #[max_length = 255]
+        email -> Nullable<Varchar>,
+        #[max_length = 100]
+        full_name -> Nullable<Varchar>,
     }
 }
 
 diesel::joinable!(bookings -> rooms (room_id));
+diesel::joinable!(bookings -> users (created_by_user_id));
 
 diesel::allow_tables_to_appear_in_same_query!(bookings, rooms, users,);

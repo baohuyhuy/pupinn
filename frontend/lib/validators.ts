@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 // === Enums ===
-export const UserRole = z.enum(["admin", "receptionist"]);
+export const UserRole = z.enum(["admin", "receptionist", "guest"]);
 export type UserRole = z.infer<typeof UserRole>;
 
 export const RoomType = z.enum(["single", "double", "suite"]);
@@ -24,7 +24,7 @@ export const LoginResponseSchema = z.object({
   token: z.string(),
   user: z.object({
     id: z.string().uuid(),
-    username: z.string(),
+    username: z.string().nullable().optional(),
     role: UserRole,
   }),
 });
@@ -32,7 +32,7 @@ export type LoginResponse = z.infer<typeof LoginResponseSchema>;
 
 export const UserInfoSchema = z.object({
   id: z.string().uuid(),
-  username: z.string(),
+  username: z.string().nullable().optional(),
   role: UserRole,
 });
 export type UserInfo = z.infer<typeof UserInfoSchema>;
@@ -43,6 +43,37 @@ export const CreateUserRequestSchema = z.object({
   role: UserRole,
 });
 export type CreateUserRequest = z.infer<typeof CreateUserRequestSchema>;
+
+// === Guest Auth Schemas ===
+export const GuestUserSchema = z.object({
+  id: z.string().uuid(),
+  email: z.string().email(),
+  full_name: z.string(),
+  role: z.literal("guest"),
+});
+export type GuestUser = z.infer<typeof GuestUserSchema>;
+
+export const GuestRegisterRequestSchema = z.object({
+  email: z.string().email("Please enter a valid email address"),
+  password: z.string()
+    .min(8, "Password must be at least 8 characters")
+    .regex(/[a-zA-Z]/, "Password must contain at least one letter")
+    .regex(/[0-9]/, "Password must contain at least one number"),
+  full_name: z.string().min(1, "Full name is required").max(100),
+});
+export type GuestRegisterRequest = z.infer<typeof GuestRegisterRequestSchema>;
+
+export const GuestLoginRequestSchema = z.object({
+  email: z.string().email("Please enter a valid email address"),
+  password: z.string().min(1, "Password is required"),
+});
+export type GuestLoginRequest = z.infer<typeof GuestLoginRequestSchema>;
+
+export const GuestAuthResponseSchema = z.object({
+  token: z.string(),
+  user: GuestUserSchema,
+});
+export type GuestAuthResponse = z.infer<typeof GuestAuthResponseSchema>;
 
 // === Room Schemas ===
 export const RoomSchema = z.object({
@@ -85,8 +116,56 @@ export const BookingSchema = z.object({
   status: BookingStatus,
   created_at: z.string().datetime(),
   updated_at: z.string().datetime(),
+  created_by_user_id: z.string().uuid().nullable().optional(),
+  creation_source: z.string().optional(),
 });
 export type Booking = z.infer<typeof BookingSchema>;
+
+// Guest-specific booking schema for API responses
+export const GuestBookingSchema = z.object({
+  id: z.string().uuid(),
+  reference: z.string(),
+  guest_name: z.string(),
+  room: z.object({
+    id: z.string().uuid(),
+    number: z.string(),
+    room_type: RoomType,
+  }),
+  check_in_date: z.string(),
+  check_out_date: z.string(),
+  status: BookingStatus,
+  created_at: z.string().datetime(),
+});
+export type GuestBooking = z.infer<typeof GuestBookingSchema>;
+
+// Guest booking creation request
+export const GuestBookingRequestSchema = z.object({
+  room_id: z.string().uuid("Please select a room"),
+  check_in_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format"),
+  check_out_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format"),
+}).refine(
+  (data) => {
+    const checkIn = new Date(data.check_in_date);
+    const checkOut = new Date(data.check_out_date);
+    return checkOut > checkIn;
+  },
+  {
+    message: "Check-out date must be after check-in date",
+    path: ["check_out_date"],
+  }
+).refine(
+  (data) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const checkIn = new Date(data.check_in_date);
+    return checkIn >= today;
+  },
+  {
+    message: "Check-in date cannot be in the past",
+    path: ["check_in_date"],
+  }
+);
+export type GuestBookingRequest = z.infer<typeof GuestBookingRequestSchema>;
 
 export const CreateBookingRequestSchema = z
   .object({
