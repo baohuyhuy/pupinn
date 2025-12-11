@@ -6,8 +6,9 @@ A modern hotel management system built as a student project for an Introduction 
 
 - **Backend**: Rust with Axum web framework
 - **Frontend**: Next.js 15 with React 19 and shadcn/ui
-- **Database**: PostgreSQL with Diesel ORM
+- **Database**: PostgreSQL 16 (Dockerized) with Diesel ORM
 - **Authentication**: JWT-based with Argon2id password hashing
+- **Infrastructure**: Docker Compose for database orchestration
 
 ## 📋 Features
 
@@ -31,23 +32,64 @@ A modern hotel management system built as a student project for an Introduction 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Rust 1.75+ with Cargo
-- Node.js 20+ with pnpm
-- PostgreSQL 15+
-- Diesel CLI (`cargo install diesel_cli --no-default-features --features postgres`)
+- **Docker** and **Docker Compose** (for database)
+- **Rust** 1.75+ with Cargo
+- **Node.js** 20+ with pnpm
+- **Diesel CLI** (`cargo install diesel_cli --no-default-features --features postgres`)
 
-### 1. Database Setup
+### 1. Database Setup (Dockerized)
+
+The project uses a Dockerized PostgreSQL 16 database with automatic migrations and optional seed data.
 
 ```bash
-# Create database
-createdb -U postgres hms_dev
+# Step 1: Create environment file
+cp .env.example .env
 
-# Set environment variable
+# Step 2: (Optional) Edit .env to customize database settings
+# Set LOAD_SEED_DATA=true to load sample data (admin, rooms, bookings)
+
+# Step 3: Start database container
+docker compose up -d postgres
+
+# Step 4: Wait for container to be healthy (10-15 seconds)
+docker compose ps
+
+# Step 5: Run migrations
 cd backend
-echo "DATABASE_URL=postgres://postgres:password@localhost/hms_dev" > .env
-
-# Run migrations
 diesel migration run
+
+# Step 6: Verify database is ready
+docker compose exec postgres pg_isready -U pupinn_user -d pupinn_db
+```
+
+**What gets created:**
+- ✅ PostgreSQL 16 container with persistent data
+- ✅ Database with all tables (users, rooms, bookings)
+- ✅ Health checks for container readiness
+
+**Default Configuration:**
+- **Database**: `pupinn_db` (customizable in `.env`)
+- **User**: `pupinn_user`
+- **Port**: `5432` (customizable if port conflict)
+- **Connection String**: `postgresql://pupinn_user:dev_password_123@localhost:5432/pupinn_db`
+
+### Seed Sample Data (Optional)
+
+Creates full demo dataset:
+- 3 users (admin, reception, guest@example.com)
+- 13 rooms (full hotel layout)
+- 5 sample bookings
+
+**Bash/Linux/Mac:**
+```bash
+# From project root
+./scripts/init-db/seed-data.sh
+```
+
+**PowerShell/Windows (Easiest - Recommended):**
+```powershell
+# From project root - Run the helper script
+.\scripts\init-db\seed-data.ps1
 ```
 
 ### 2. Backend Setup
@@ -55,21 +97,22 @@ diesel migration run
 ```bash
 cd backend
 
-# Create .env file
+# Create .env file (adjust DATABASE_URL if you customized database settings)
 cat > .env << EOF
-DATABASE_URL=postgres://postgres:password@localhost/hms_dev
+DATABASE_URL=postgresql://pupinn_user:dev_password_123@localhost:5432/pupinn_db
 JWT_SECRET=$(openssl rand -hex 64)
 ALLOWED_ORIGIN=http://localhost:3000
 SERVER_HOST=0.0.0.0
 SERVER_PORT=8080
 EOF
 
-# Seed database with sample data
-cargo run --bin seed
-
 # Start server
 cargo run --bin server
 ```
+
+The server will start on `http://localhost:8080`.
+
+> **Note**: If you haven't seeded sample data yet, see the "Optional: Seed Sample Data" section above.
 
 ### 3. Frontend Setup
 
@@ -98,13 +141,18 @@ Open http://localhost:3000 in your browser.
 | Guest Dashboard | http://localhost:3000/guest       | Guest booking area     |
 | Staff Dashboard | http://localhost:3000             | Staff management area  |
 
-**Staff Credentials:**
+**Staff Credentials** (available with both seed options):
 | Username  | Password     | Role         |
 | --------- | ------------ | ------------ |
 | admin     | admin123     | Admin        |
 | reception | reception123 | Receptionist |
 
-**Guest Registration:**
+**Sample Guest Account** (only with SQL seed scripts - Option B):
+| Email             | Password | Name     |
+| ----------------- | -------- | -------- |
+| guest@example.com | guest123 | John Doe |
+
+**Or Register New Guest:**
 Guests can self-register at `/register` with email, password, and full name.
 
 ## 📁 Project Structure
@@ -123,12 +171,80 @@ Guests can self-register at `/register` with email, password, and full name.
 │   └── tests/             # Unit tests
 │
 ├── frontend/
-    ├── app/               # Next.js App Router pages
-    ├── components/        # React components
-    │   └── ui/            # shadcn/ui primitives
-    ├── lib/               # Utilities, API client, validators
-    └── hooks/             # Custom React hooks
+│   ├── app/               # Next.js App Router pages
+│   ├── components/        # React components
+│   │   └── ui/            # shadcn/ui primitives
+│   ├── lib/               # Utilities, API client, validators
+│   └── hooks/             # Custom React hooks
+│
+├── scripts/
+│   └── init-db/           # Database initialization scripts
+│       ├── 01-run-migrations.sh    # Diesel migration runner
+│       ├── 02-seed-data.sh         # Optional seed data loader
+│       └── seeds/         # SQL seed files
+│           ├── 01-seed-users.sql   # Sample users
+│           ├── 02-seed-rooms.sql   # Sample rooms
+│           └── 03-seed-bookings.sql # Sample bookings
+│
+├── docker-compose.yml     # Database container orchestration
+└── .env.example           # Environment variable template
 
+```
+
+## 🐳 Docker Database Management
+
+### Common Commands
+
+```bash
+# Start database
+docker compose up -d postgres
+
+# Stop database
+docker compose down
+
+# Stop and remove data (fresh start)
+docker compose down -v
+
+# View logs
+docker compose logs postgres
+
+# Check health status
+docker compose ps
+
+# Access PostgreSQL shell
+docker compose exec postgres psql -U pupinn_user -d pupinn_db
+
+# Backup database
+# Bash: docker compose exec postgres pg_dump -U pupinn_user pupinn_db > backup.sql
+# PowerShell: docker compose exec postgres pg_dump -U pupinn_user pupinn_db | Out-File -Encoding utf8 backup.sql
+
+# Restore database
+# Bash: docker compose exec -T postgres psql -U pupinn_user -d pupinn_db < backup.sql
+# PowerShell: Get-Content backup.sql | docker compose exec -T postgres psql -U pupinn_user -d pupinn_db
+```
+
+### Troubleshooting
+
+**Port conflict (5432 already in use):**
+Edit `.env` and change `POSTGRES_PORT=5433`, then update backend `DATABASE_URL` accordingly.
+
+**Database not responding:**
+```bash
+# Check container status
+docker compose ps
+
+# View recent logs
+docker compose logs --tail=50 postgres
+
+# Restart container
+docker compose restart postgres
+```
+
+**Reset database completely:**
+```bash
+docker compose down -v
+docker compose up -d postgres
+cd backend && diesel migration run
 ```
 
 ## 🧪 Testing
