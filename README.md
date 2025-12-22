@@ -13,17 +13,20 @@ A modern hotel management system built as a student project for an Introduction 
 ## 📋 Features
 
 ### Core Functionality
+
 - **Booking Management**: Create, view, and cancel reservations
 - **Room Management**: Add rooms, update status (Available/Occupied/Maintenance)
 - **Guest Check-in/Check-out**: Full guest lifecycle management
 - **Dashboard**: Today's arrivals, departures, and room availability stats
 
 ### User Roles
+
 - **Guest**: Self-register, login, search rooms, book rooms, view/cancel own bookings
 - **Receptionist**: Book rooms, check-in/out guests, view all bookings
 - **Admin**: All receptionist permissions + room management
 
 ### Guest Self-Service Portal
+
 - **Registration**: Guests can create accounts with email, password, and name
 - **Room Search**: Search available rooms by date range and room type
 - **Self-Booking**: Book rooms directly without staff assistance
@@ -32,6 +35,7 @@ A modern hotel management system built as a student project for an Introduction 
 ## 🚀 Quick Start
 
 ### Prerequisites
+
 - **Docker** and **Docker Compose** (for database)
 - **Rust** 1.75+ with Cargo
 - **Node.js** 20+ with pnpm
@@ -42,32 +46,25 @@ A modern hotel management system built as a student project for an Introduction 
 The project uses a Dockerized PostgreSQL 16 database with automatic migrations and optional seed data.
 
 ```bash
-# Step 1: Create environment file
-cp .env.example .env
+# Step 1: Create environment file and edit your own customize database settings
+mv .env.example .env
+# Step 1.1: Edit .env to customize database settings
 
-# Step 2: (Optional) Edit .env to customize database settings
-# Set LOAD_SEED_DATA=true to load sample data (admin, rooms, bookings)
-
-# Step 3: Start database container
+# Step 2: Start database container
 docker compose up -d postgres
 
-# Step 4: Wait for container to be healthy (10-15 seconds)
+# Step 3: Wait for container to be healthy (10-15 seconds)
 docker compose ps
-
-# Step 5: Run migrations
-cd backend
-diesel migration run
-
-# Step 6: Verify database is ready
-docker compose exec postgres pg_isready -U pupinn_user -d pupinn_db
 ```
 
 **What gets created:**
+
 - ✅ PostgreSQL 16 container with persistent data
 - ✅ Database with all tables (users, rooms, bookings)
 - ✅ Health checks for container readiness
 
 **Default Configuration:**
+
 - **Database**: `pupinn_db` (customizable in `.env`)
 - **User**: `pupinn_user`
 - **Port**: `5432` (customizable if port conflict)
@@ -76,17 +73,20 @@ docker compose exec postgres pg_isready -U pupinn_user -d pupinn_db
 ### Seed Sample Data (Optional)
 
 Creates full demo dataset:
+
 - 3 users (admin, reception, guest@example.com)
 - 13 rooms (full hotel layout)
 - 5 sample bookings
 
 **Bash/Linux/Mac:**
+
 ```bash
 # From project root
 ./scripts/init-db/seed-data.sh
 ```
 
 **PowerShell/Windows (Easiest - Recommended):**
+
 ```powershell
 # From project root - Run the helper script
 .\scripts\init-db\seed-data.ps1
@@ -97,14 +97,15 @@ Creates full demo dataset:
 ```bash
 cd backend
 
-# Create .env file (adjust DATABASE_URL if you customized database settings)
-cat > .env << EOF
-DATABASE_URL=postgresql://pupinn_user:dev_password_123@localhost:5432/pupinn_db
-JWT_SECRET=$(openssl rand -hex 64)
+# Create .env file (adjust DATABASE_URL if you customized database settings) with your own username, password, port, and database name
+DATABASE_URL=postgresql://{your_username}:{your_password}@localhost:{your_port}/{your_database_name}
+JWT_SECRET={your_jwt_secret} // or generate a random one with (openssl rand -hex 64)
 ALLOWED_ORIGIN=http://localhost:3000
 SERVER_HOST=0.0.0.0
 SERVER_PORT=8080
-EOF
+
+# Run migrations
+diesel migration run
 
 # Start server
 cargo run --bin server
@@ -134,21 +135,21 @@ pnpm dev
 Open http://localhost:3000 in your browser.
 
 **Portal URLs:**
-| Portal          | URL                               | Description            |
+| Portal | URL | Description |
 | --------------- | --------------------------------- | ---------------------- |
-| Guest Login     | http://localhost:3000/login       | Guest sign in/register |
-| Staff Login     | http://localhost:3000/staff/login | Staff portal           |
-| Guest Dashboard | http://localhost:3000/guest       | Guest booking area     |
-| Staff Dashboard | http://localhost:3000             | Staff management area  |
+| Guest Login | http://localhost:3000/login | Guest sign in/register |
+| Staff Login | http://localhost:3000/staff/login | Staff portal |
+| Guest Dashboard | http://localhost:3000/guest | Guest booking area |
+| Staff Dashboard | http://localhost:3000 | Staff management area |
 
 **Staff Credentials** (available with both seed options):
-| Username  | Password     | Role         |
+| Username | Password | Role |
 | --------- | ------------ | ------------ |
-| admin     | admin123     | Admin        |
+| admin | admin123 | Admin |
 | reception | reception123 | Receptionist |
 
 **Sample Guest Account** (only with SQL seed scripts - Option B):
-| Email             | Password | Name     |
+| Email | Password | Name |
 | ----------------- | -------- | -------- |
 | guest@example.com | guest123 | John Doe |
 
@@ -229,6 +230,7 @@ docker compose exec postgres psql -U pupinn_user -d pupinn_db
 Edit `.env` and change `POSTGRES_PORT=5433`, then update backend `DATABASE_URL` accordingly.
 
 **Database not responding:**
+
 ```bash
 # Check container status
 docker compose ps
@@ -241,6 +243,7 @@ docker compose restart postgres
 ```
 
 **Reset database completely:**
+
 ```bash
 docker compose down -v
 docker compose up -d postgres
@@ -262,16 +265,19 @@ pnpm build
 ## 📖 API Endpoints
 
 ### Staff Authentication
+
 - `POST /auth/login` - Staff login with username/password
 - `GET /auth/me` - Get current staff user info
 - `POST /auth/users` - Create new staff user (admin only)
 
 ### Guest Authentication
+
 - `POST /auth/register` - Register new guest account
 - `POST /auth/guest/login` - Guest login with email/password
 - `GET /auth/guest/me` - Get current guest user info
 
 ### Rooms
+
 - `GET /rooms` - List all rooms (with optional filters)
 - `GET /rooms/:id` - Get room by ID
 - `POST /rooms` - Create room (admin only)
@@ -279,6 +285,7 @@ pnpm build
 - `GET /rooms/available` - Get available rooms for date range
 
 ### Staff Bookings
+
 - `GET /bookings` - List all bookings (with filters)
 - `GET /bookings/:id` - Get booking by ID
 - `GET /bookings/reference/:ref` - Get booking by reference
@@ -288,6 +295,7 @@ pnpm build
 - `POST /bookings/:id/cancel` - Cancel booking
 
 ### Guest Bookings
+
 - `GET /guest/bookings` - List own bookings (requires guest auth)
 - `GET /guest/bookings/:id` - Get own booking by ID
 - `POST /guest/bookings` - Create new booking (guest)
@@ -296,6 +304,7 @@ pnpm build
 ## 🎓 Course Context
 
 This project was developed as part of an Introduction to Software Engineering course, demonstrating:
+
 - MVC-Layered Architecture
 - Unit Testing for business logic
 - Clean Code principles
@@ -306,4 +315,3 @@ This project was developed as part of an Introduction to Software Engineering co
 ## 📝 License
 
 MIT License - See LICENSE file for details.
-
