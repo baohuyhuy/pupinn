@@ -252,6 +252,7 @@ export default function AdminBookingsPage() {
           onCheckIn={handleCheckIn}
           onCheckOut={handleCheckOut}
           onCancel={handleCancel}
+          basePath="/staff/admin/bookings"
         />
       </div>
 

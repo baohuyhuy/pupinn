@@ -1,47 +1,27 @@
 "use client";
 
-import { useEffect, useState, use } from "react"; // Added 'use' for params unwrapping
+import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { ArrowLeft, User, Calendar, BedDouble, CreditCard } from "lucide-react";
+import { ArrowLeft, User, Calendar, BedDouble } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/components/auth-provider";
-import { apiClient, getErrorMessage } from "@/lib/api-client";
-import { type BookingWithRoom } from "@/components/booking-list"; // Reuse type if exported, or redefine
 import { RouteGuard } from "@/components/route-guard";
+import { apiClient, getErrorMessage } from "@/lib/api-client";
+import { type BookingWithRoom } from "@/components/booking-list";
 
-// If you didn't export BookingWithRoom from booking-list.tsx, uncomment below:
-/*
-interface BookingWithRoom {
-  id: string;
-  reference: string;
-  guest_name: string;
-  status: "upcoming" | "checked_in" | "checked_out" | "cancelled";
-  check_in_date: string;
-  check_out_date: string;
-  room: {
-    id: string;
-    number: string;
-    room_type: string;
-  } | null;
-}
-*/
-
-export default function BookingDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  // Unwrap params using React.use()
+export default function AdminBookingDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
 
-  // Redirect if not authenticated
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
-      router.push("/login");
+      router.push("/staff/login");
     }
   }, [authLoading, isAuthenticated, router]);
 
@@ -54,7 +34,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
     enabled: !!id && isAuthenticated,
   });
 
-  if (isLoading) {
+  if (authLoading || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-900">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500"></div>
@@ -84,11 +64,9 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
   };
 
   return (
-    <RouteGuard>
+    <RouteGuard requiredRole="admin">
       <div className="min-h-screen bg-linear-to-br from-slate-900 via-slate-800 to-slate-900 p-8">
         <div className="max-w-4xl mx-auto">
-          
-          {/* Header */}
           <div className="flex items-center gap-4 mb-8">
             <Button 
               variant="ghost" 
@@ -110,8 +88,6 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            
-            {/* Guest Info */}
             <Card className="bg-slate-800/80 border-slate-700">
               <CardHeader>
                 <CardTitle className="text-slate-100 flex items-center gap-2">
@@ -127,7 +103,6 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
               </CardContent>
             </Card>
 
-            {/* Room Info */}
             <Card className="bg-slate-800/80 border-slate-700">
               <CardHeader>
                 <CardTitle className="text-slate-100 flex items-center gap-2">
@@ -152,7 +127,6 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
               </CardContent>
             </Card>
 
-            {/* Dates & Timeline */}
             <Card className="md:col-span-2 bg-slate-800/80 border-slate-700">
               <CardHeader>
                 <CardTitle className="text-slate-100 flex items-center gap-2">
@@ -181,9 +155,9 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
               </CardContent>
             </Card>
           </div>
-
         </div>
       </div>
     </RouteGuard>
   );
 }
+

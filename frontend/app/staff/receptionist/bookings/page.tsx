@@ -252,6 +252,7 @@ export default function ReceptionistBookingsPage() {
           onCheckIn={handleCheckIn}
           onCheckOut={handleCheckOut}
           onCancel={handleCancel}
+          basePath="/staff/receptionist/bookings"
         />
       </div>
 

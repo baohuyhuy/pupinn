@@ -45,6 +45,7 @@ interface BookingListProps {
   onCheckIn?: (bookingId: string) => void;
   onCheckOut?: (bookingId: string) => void;
   onCancel?: (bookingId: string) => void;
+  basePath?: string; // Base path for booking detail links (e.g., "/staff/admin/bookings" or "/staff/receptionist/bookings")
 }
 
 export function BookingList({
@@ -54,6 +55,7 @@ export function BookingList({
   onCheckIn,
   onCheckOut,
   onCancel,
+  basePath = "/bookings", // Default to old path for backward compatibility
 }: BookingListProps) {
   const getStatusBadge = (status: BookingStatus) => {
     const variants: Record<BookingStatus, { className: string; label: string }> =
@@ -169,7 +171,7 @@ export function BookingList({
                 <TableCell>{getStatusBadge(booking.status)}</TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1">
-                    <Link href={`/bookings/${booking.id}`}>
+                    <Link href={`${basePath}/${booking.id}`}>
                       <Button
                         variant="ghost"
                         size="sm"
