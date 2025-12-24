@@ -13,7 +13,7 @@ export default function NewBookingPage() {
 
   // Redirect to login if not authenticated
   if (!isLoading && !isAuthenticated) {
-    router.push("/login");
+    router.push("/staff/login");
     return null;
   }
 

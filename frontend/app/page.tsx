@@ -60,7 +60,8 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      router.push("/login");
+      // Redirect to guest login by default
+      router.push("/guest/login");
     }
   }, [isLoading, isAuthenticated, router]);
 

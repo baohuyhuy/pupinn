@@ -381,9 +381,9 @@ impl BookingService {
             .get_result(&mut conn)
             .map_err(|e| AppError::DatabaseError(e.to_string()))?;
 
-        // Update room status to available
+        // Update room status to dirty so cleaners can pick it up immediately
         let room_service = RoomService::new(self.pool.clone());
-        room_service.update_room_status(booking.room_id, RoomStatus::Available)?;
+        room_service.update_room_status(booking.room_id, RoomStatus::Dirty)?;
 
         Ok(updated_booking)
     }

@@ -19,7 +19,7 @@ export default function GuestLayout({
 
   // Redirect if not authenticated (client-side only)
   if (typeof window !== "undefined" && !isAuthenticated) {
-    redirect("/login");
+    redirect("/guest/login");
   }
 
   return (

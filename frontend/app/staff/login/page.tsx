@@ -157,7 +157,7 @@ export default function StaffLoginPage() {
               <p className="text-slate-400">
                 Guest looking to book a room?{" "}
                 <Link
-                  href="/login"
+                  href="/guest/login"
                   className="text-amber-400 hover:text-amber-300 font-medium transition-colors"
                 >
                   Guest login

@@ -5,11 +5,47 @@ import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { useToast } from "@/hooks/use-toast";
 
+type StaffRole = "admin" | "receptionist" | "cleaner";
+
+/**
+ * Check if a user role has access to a required role based on hierarchy:
+ * - admin can access admin, receptionist, and cleaner routes
+ * - receptionist can access receptionist and cleaner routes
+ * - cleaner can only access cleaner routes
+ */
+function hasRoleAccess(userRole: string | undefined, requiredRole: StaffRole | undefined): boolean {
+  if (!requiredRole) {
+    // No specific role required, any staff member can access
+    return userRole === "admin" || userRole === "receptionist" || userRole === "cleaner";
+  }
+
+  if (!userRole) return false;
+
+  // Role hierarchy: admin > receptionist > cleaner
+  const roleHierarchy: Record<string, number> = {
+    admin: 3,
+    receptionist: 2,
+    cleaner: 1,
+  };
+
+  const userLevel = roleHierarchy[userRole] || 0;
+  const requiredLevel = roleHierarchy[requiredRole] || 0;
+
+  // User can access if their level is >= required level
+  return userLevel >= requiredLevel;
+}
+
 /**
  * RouteGuard protects staff-only routes from guest access.
- * Redirects guest users to /guest with a toast notification.
+ * Supports role hierarchy: admin > receptionist > cleaner
  */
-export function RouteGuard({ children }: { children: React.ReactNode }) {
+export function RouteGuard({ 
+  children, 
+  requiredRole 
+}: { 
+  children: React.ReactNode;
+  requiredRole?: StaffRole;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const { user, isLoading } = useAuth();
@@ -19,8 +55,8 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isLoading) return;
 
-    // Allow access if user is admin or receptionist
-    if (user && (user.role === "admin" || user.role === "receptionist")) {
+    // Check if user is staff and has required role access
+    if (user && hasRoleAccess(user.role, requiredRole)) {
       setIsChecking(false);
       return;
     }
@@ -42,8 +78,28 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    // User doesn't have required role
+    if (user && !hasRoleAccess(user.role, requiredRole)) {
+      toast({
+        title: "Access Denied",
+        description: `This page requires ${requiredRole} access or higher.`,
+        variant: "destructive",
+      });
+      // Redirect based on user's role
+      if (user.role === "admin") {
+        router.push("/staff/admin/rooms");
+      } else if (user.role === "receptionist") {
+        router.push("/staff/receptionist/dashboard");
+      } else if (user.role === "cleaner") {
+        router.push("/staff/cleaner/dashboard");
+      } else {
+        router.push("/staff/login");
+      }
+      return;
+    }
+
     setIsChecking(false);
-  }, [user, isLoading, router, pathname, toast]);
+  }, [user, isLoading, router, pathname, toast, requiredRole]);
 
   // Show nothing while checking (prevents flash of protected content)
   if (isChecking || isLoading) {
@@ -54,7 +110,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // User is staff - render protected content
+  // User is staff with required access - render protected content
   return <>{children}</>;
 }
 

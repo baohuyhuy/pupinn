@@ -21,6 +21,7 @@ interface AuthContextType {
   logout: () => void;
   isAdmin: boolean;
   isReceptionist: boolean;
+  isCleaner: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -51,7 +52,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       authLogin(response.data);
       setUser(response.data.user);
-      router.push('/');
+      const role = response.data.user.role;
+      if (role === 'admin') {
+        router.push('/staff/admin/dashboard');
+      } else if (role === 'receptionist') {
+        router.push('/staff/receptionist/dashboard');
+      } else if (role === 'cleaner') {
+        router.push('/staff/cleaner/dashboard');
+      }
+      else {
+        router.push('/staff/login');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -60,7 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(() => {
     authLogout();
     setUser(null);
-    router.push('/login');
+    router.push('/staff/login');
   }, [router]);
 
   const value: AuthContextType = {
@@ -71,6 +82,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     logout,
     isAdmin: user?.role === 'admin',
     isReceptionist: user?.role === 'receptionist',
+    isCleaner: user?.role === 'cleaner',
   };
 
   return (

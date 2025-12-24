@@ -13,6 +13,7 @@ import {
   Shield,
   PawPrint,
   UserPlus,
+  Brush, // Added Brush icon for Cleaner
 } from "lucide-react";
 
 import {
@@ -35,7 +36,7 @@ const NAVIGATION = [
   {
     label: "Overview",
     items: [
-      { title: "Dashboard", href: "/", icon: Home },
+      { title: "Dashboard", href: "/dashboard", icon: Home },
       { title: "Bookings", href: "/bookings", icon: CalendarDays },
       { title: "Rooms", href: "/rooms", icon: BedDouble },
     ],
@@ -49,14 +50,75 @@ const NAVIGATION = [
   },
 ];
 
+// Specific navigation for Cleaners
+const CLEANER_NAVIGATION = [
+  {
+    label: "Overview",
+    items: [
+      { title: "Dashboard", href: "/staff/cleaner/dashboard", icon: Brush },
+    ],
+  },
+];
+
+// Navigation for Admin
+const ADMIN_NAVIGATION = [
+  {
+    label: "Overview",
+    items: [
+      { title: "Dashboard", href: "/staff/admin/dashboard", icon: Home },
+      { title: "Bookings", href: "/staff/admin/bookings", icon: CalendarDays },
+      { title: "Rooms", href: "/staff/admin/rooms", icon: BedDouble },
+      { title: "Housekeeping", href: "/staff/admin/housekeeping", icon: Brush },
+    ],
+  },
+  {
+    label: "Operations",
+    items: [
+      { title: "Create Booking", href: "/staff/admin/bookings/new", icon: NotebookPen },
+      { title: "Create Room", href: "/staff/admin/rooms/new", icon: BedDouble },
+    ],
+  },
+];
+
+// Navigation for Receptionist
+const RECEPTIONIST_NAVIGATION = [
+  {
+    label: "Overview",
+    items: [
+      { title: "Dashboard", href: "/staff/receptionist/dashboard", icon: Home },
+      { title: "Bookings", href: "/staff/receptionist/bookings", icon: CalendarDays },
+    ],
+  },
+  {
+    label: "Operations",
+    items: [
+      { title: "Create Booking", href: "/staff/receptionist/bookings/new", icon: NotebookPen },
+    ],
+  },
+];
+
 export function AppSidebar() {
   const pathname = usePathname();
+  // extracting isCleaner if you added it to AuthProvider, otherwise check role manually
   const { user, logout, isAdmin, isAuthenticated } = useAuth();
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
+  
+  const isCleaner = user?.role === "cleaner";
+  const isReceptionist = user?.role === "receptionist";
+
+  // Select which menu to show based on role
+  let menuToRender = NAVIGATION;
+  if (isCleaner) {
+    menuToRender = CLEANER_NAVIGATION;
+  } else if (isAdmin) {
+    menuToRender = ADMIN_NAVIGATION;
+  } else if (isReceptionist) {
+    menuToRender = RECEPTIONIST_NAVIGATION;
+  }
 
   return (
-    <Sidebar className="bg-linear-to-br from-slate-950 via-slate-900 to-slate-950/90">
+    <Sidebar className="h-screen sticky top-0 border-r-0 bg-linear-to-br from-slate-950 via-slate-900 to-slate-950/90">
       <SidebarHeader className="border-transparent px-4 pt-6 pb-4">
         <div className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/10 text-amber-400">
@@ -77,7 +139,7 @@ export function AppSidebar() {
         </div>
       </SidebarHeader>
       <SidebarContent className="px-4">
-        {NAVIGATION.map((section) => (
+        {menuToRender.map((section) => (
           <SidebarGroup key={section.label}>
             {!isCollapsed && (
               <SidebarGroupLabel className="text-[11px] tracking-wide text-slate-400">
@@ -85,12 +147,7 @@ export function AppSidebar() {
               </SidebarGroupLabel>
             )}
             <SidebarMenu>
-              {section.items
-                .filter((item) =>
-                  // Receptionists should not see "Create Room" in the sidebar
-                  item.title === "Create Room" ? isAdmin : true
-                )
-                .map((item) => (
+              {section.items.map((item) => (
                   <SidebarMenuItem key={item.href}>
                     <SidebarMenuButton
                       asChild
@@ -119,7 +176,8 @@ export function AppSidebar() {
           </SidebarGroup>
         ))}
 
-        {!isCollapsed && (
+        {/* Hide "Hospitality Insights" for Cleaners */}
+        {!isCollapsed && !isCleaner && (
           <SidebarGroup>
             <SidebarGroupLabel className="text-[11px] tracking-wide text-slate-400">
               Hospitality Insights
@@ -139,7 +197,7 @@ export function AppSidebar() {
                 size="sm"
                 className="mt-4 w-full bg-amber-500 text-slate-900 hover:bg-amber-400"
               >
-                <Link href="/bookings">View Timeline</Link>
+                <Link href={isAdmin ? "/staff/admin/bookings" : "/staff/receptionist/bookings"}>View Timeline</Link>
               </Button>
             </div>
           </SidebarGroup>
@@ -173,6 +231,10 @@ export function AppSidebar() {
                         <>
                           <Shield className="h-3 w-3" /> Admin
                         </>
+                      ) : isCleaner ? (
+                        <>
+                           <Brush className="h-3 w-3" /> Cleaner
+                        </>
                       ) : (
                         "Receptionist"
                       )}
@@ -202,7 +264,7 @@ export function AppSidebar() {
                   className="h-10 w-10 rounded-full border border-amber-400/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 cursor-pointer"
                   title="Sign in"
                 >
-                  <Link href="/login">
+                  <Link href="/staff/login">
                     <LogIn className="h-4 w-4" />
                   </Link>
                 </Button>
@@ -219,7 +281,7 @@ export function AppSidebar() {
                     size="sm"
                     className="w-full justify-center gap-2 bg-amber-500 text-slate-900 hover:bg-amber-400 cursor-pointer"
                   >
-                    <Link href="/login">
+                    <Link href="/staff/login">
                       <LogIn className="h-4 w-4" />
                       <span>Staff sign in</span>
                     </Link>

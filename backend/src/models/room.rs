@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::schema::rooms;
+use crate::models::UserRole;
 
 /// Room type enum matching PostgreSQL room_type type
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, DbEnum)]
@@ -26,6 +27,8 @@ pub enum RoomStatus {
     Available,
     Occupied,
     Maintenance,
+    Dirty,
+    Cleaning,
 }
 
 /// Room model representing a hotel room
@@ -64,14 +67,33 @@ impl RoomStatus {
             // Available can go to occupied (check-in) or maintenance
             (RoomStatus::Available, RoomStatus::Occupied) => true,
             (RoomStatus::Available, RoomStatus::Maintenance) => true,
-            // Occupied can only go to available (check-out)
+            (RoomStatus::Available, RoomStatus::Dirty) => true, // Manual override (admin only)
+            // Occupied can go to available (check-out) or dirty (automatic on check-out)
             (RoomStatus::Occupied, RoomStatus::Available) => true,
+            (RoomStatus::Occupied, RoomStatus::Dirty) => true, // Automatic on check-out
             // Maintenance can only go to available
             (RoomStatus::Maintenance, RoomStatus::Available) => true,
+            // Cleaning workflow transitions
+            (RoomStatus::Dirty, RoomStatus::Cleaning) => true, // Cleaner starts work
+            (RoomStatus::Dirty, RoomStatus::Available) => true, // Direct completion (allowed but unusual)
+            (RoomStatus::Cleaning, RoomStatus::Available) => true, // Cleaner finishes work
+            (RoomStatus::Cleaning, RoomStatus::Dirty) => true, // Rework needed
             // Same status is always valid (no-op)
             (a, b) if *a == b => true,
             // All other transitions are invalid
             _ => false,
+        }
+    }
+
+    /// Check if a role is allowed to set this status
+    /// Returns true if the role can set this status, false otherwise
+    pub fn is_allowed_for_role(&self, role: UserRole) -> bool {
+        match (self, role) {
+            // Cleaners cannot set rooms to Occupied or Maintenance
+            (RoomStatus::Occupied, UserRole::Cleaner) => false,
+            (RoomStatus::Maintenance, UserRole::Cleaner) => false,
+            // All other statuses are allowed for cleaners
+            _ => true,
         }
     }
 }

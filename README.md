@@ -15,15 +15,17 @@ A modern hotel management system built as a student project for an Introduction 
 ### Core Functionality
 
 - **Booking Management**: Create, view, and cancel reservations
-- **Room Management**: Add rooms, update status (Available/Occupied/Maintenance)
-- **Guest Check-in/Check-out**: Full guest lifecycle management
+- **Room Management**: Add rooms, update status (Available/Occupied/Maintenance/Dirty/Cleaning)
+- **Guest Check-in/Check-out**: Full guest lifecycle management (checkout now marks rooms Dirty)
 - **Dashboard**: Today's arrivals, departures, and room availability stats
+- **Cleaner Dashboard**: Visual status indicators (red/yellow/green) and cleaning workflow (Dirty → Cleaning → Available)
 
 ### User Roles
 
 - **Guest**: Self-register, login, search rooms, book rooms, view/cancel own bookings
 - **Receptionist**: Book rooms, check-in/out guests, view all bookings
 - **Admin**: All receptionist permissions + room management
+- **Cleaner**: Access cleaner dashboard to view Dirty/Cleaning/Available rooms, update statuses, and cannot set rooms to Occupied/Maintenance
 
 ### Guest Self-Service Portal
 

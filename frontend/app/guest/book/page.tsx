@@ -131,129 +131,22 @@ export default function GuestBookPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Link href="/guest">
-          <Button variant="ghost" size="icon" className="text-slate-400">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold text-slate-100">Book a Room</h1>
-          <p className="text-slate-400">
-            Search available rooms and make a reservation
-          </p>
-        </div>
-      </div>
+"use client";
 
-      {/* Booking Form */}
-      <GuestBookingForm
-        availableRooms={availableRooms}
-        isLoadingRooms={isLoadingRooms}
-        onSearch={handleSearch}
-        onBook={handleBook}
-        isBooking={bookingMutation.isPending}
-      />
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
-      {/* Confirmation Dialog */}
-      <Dialog open={showConfirmation} onOpenChange={setShowConfirmation}>
-        <DialogContent className="bg-slate-800 border-slate-700 text-slate-100 max-w-md">
-          <DialogHeader>
-            <div className="mx-auto w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mb-4">
-              <CheckCircle className="h-8 w-8 text-emerald-400" />
-            </div>
-            <DialogTitle className="text-xl text-center">
-              Booking Confirmed!
-            </DialogTitle>
-            <DialogDescription className="text-slate-400 text-center">
-              Your reservation has been successfully created.
-            </DialogDescription>
-          </DialogHeader>
+export default function GuestBookRedirectPage() {
+  const router = useRouter();
 
-          {bookingResult?.booking && (
-            <Card className="bg-slate-700/50 border-slate-600 mt-4">
-              <CardContent className="pt-6 space-y-4">
-                {/* Reference */}
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400">Reference</span>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-amber-400 text-lg">
-                      {bookingResult.booking.reference}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-slate-400 hover:text-slate-100"
-                      onClick={handleCopyReference}
-                    >
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
+  useEffect(() => {
+    // Redirect to new bookings page
+    router.replace("/guest/bookings/new");
+  }, [router]);
 
-                {/* Room */}
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400">Room</span>
-                  <span className="text-slate-100">
-                    <Home className="h-4 w-4 inline mr-1 text-slate-400" />
-                    {bookingResult.room?.number} ({bookingResult.room?.room_type}
-                    )
-                  </span>
-                </div>
-
-                {/* Dates */}
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400">Check-in</span>
-                  <span className="text-slate-100">
-                    <Calendar className="h-4 w-4 inline mr-1 text-slate-400" />
-                    {format(
-                      new Date(bookingResult.booking.check_in_date + "T00:00:00"),
-                      "MMM d, yyyy"
-                    )}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400">Check-out</span>
-                  <span className="text-slate-100">
-                    <Calendar className="h-4 w-4 inline mr-1 text-slate-400" />
-                    {format(
-                      new Date(bookingResult.booking.check_out_date + "T00:00:00"),
-                      "MMM d, yyyy"
-                    )}
-                  </span>
-                </div>
-
-                {/* Status */}
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400">Status</span>
-                  <span className="px-2 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-sm capitalize">
-                    {bookingResult.booking.status}
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          <div className="flex gap-3 mt-4">
-            <Button
-              variant="outline"
-              className="flex-1 border-slate-600 text-slate-100 hover:bg-slate-700"
-              onClick={() => {
-                setShowConfirmation(false);
-                setSearchParams(null);
-                setBookingResult(null);
-              }}
-            >
-              Book Another
-            </Button>
-            <Button
-              className="flex-1 bg-amber-500 hover:bg-amber-600 text-slate-900"
-              onClick={handleCloseConfirmation}
-            >
-              View My Bookings
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-slate-900 via-slate-800 to-slate-900">
+      <div className="text-slate-400">Redirecting...</div>
     </div>
   );
 }

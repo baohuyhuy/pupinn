@@ -38,7 +38,7 @@ const createRoomSchema = z.object({
 
 const updateRoomSchema = z.object({
   room_type: z.enum(["single", "double", "suite"]).optional(),
-  status: z.enum(["available", "occupied", "maintenance"]).optional(),
+  status: z.enum(["available", "occupied", "maintenance", "dirty", "cleaning"]).optional(),
 });
 
 type CreateRoomData = z.infer<typeof createRoomSchema>;
@@ -208,6 +208,20 @@ export function RoomForm({ room, onSuccess, onCancel }: RoomFormProps) {
                   >
                     Maintenance
                   </SelectItem>
+                  <SelectItem
+                    value="dirty"
+                    className="text-slate-100"
+                    disabled={room.status === "dirty"}
+                  >
+                    Dirty
+                  </SelectItem>
+                  <SelectItem
+                    value="cleaning"
+                    className="text-slate-100"
+                    disabled={room.status === "cleaning"}
+                  >
+                    Cleaning
+                  </SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-xs text-slate-500">
@@ -249,3 +263,4 @@ export function RoomForm({ room, onSuccess, onCancel }: RoomFormProps) {
     </Card>
   );
 }
+

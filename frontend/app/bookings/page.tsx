@@ -142,11 +142,23 @@ export default function BookingsPage() {
       setCheckOutDialog({ open: false, bookingId: null });
     },
     onError: (error: Error) => {
-      toast({
-        title: "Check-out Failed",
-        description: getErrorMessage(error),
-        variant: "destructive",
-      });
+      const message = getErrorMessage(error);
+      if (message.includes("CheckOut")) {
+        queryClient.invalidateQueries({ queryKey: ["bookings-rooms"] });
+      
+        toast({
+          title: "Already Checked Out",
+          description: "The guest has already been checked out.",
+          className: "bg-blue-500 text-white border-none",
+        });
+        setCheckOutDialog({ open: false, bookingId: null });
+      } else {
+        toast({
+          title: "Check-out Failed",
+          description: getErrorMessage(error),
+          variant: "destructive",
+        });
+      }
     },
   });
 

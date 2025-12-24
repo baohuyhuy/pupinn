@@ -13,6 +13,7 @@ import {
   LogOut,
   Menu,
   X,
+  Hotel,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -23,8 +24,13 @@ const navItems = [
     icon: LayoutDashboard,
   },
   {
+    title: "View Rooms",
+    href: "/guest/rooms",
+    icon: Hotel,
+  },
+  {
     title: "Book a Room",
-    href: "/guest/book",
+    href: "/guest/bookings/new",
     icon: CalendarPlus,
   },
   {

@@ -87,3 +87,39 @@ export function getErrorMessage(error: unknown): string {
   }
   return "An unexpected error occurred";
 }
+
+// === Cleaner API Methods ===
+import { type Room, type RoomStatus } from "./validators";
+
+/**
+ * Get rooms for cleaner dashboard
+ * Defaults to showing dirty rooms if no status filter is provided
+ */
+export async function getCleanerRooms(
+  status?: RoomStatus,
+  roomType?: string
+): Promise<Room[]> {
+  const params: Record<string, string> = {};
+  if (status) {
+    params.status = status;
+  }
+  if (roomType) {
+    params.room_type = roomType;
+  }
+  const response = await apiClient.get<Room[]>("/cleaner/rooms", { params });
+  return response.data;
+}
+
+/**
+ * Update room status (cleaner endpoint)
+ * Cleaners can transition rooms: Dirty → Cleaning → Available
+ */
+export async function updateRoomStatus(
+  roomId: string,
+  status: RoomStatus
+): Promise<Room> {
+  const response = await apiClient.patch<Room>(`/cleaner/rooms/${roomId}/status`, {
+    status,
+  });
+  return response.data;
+}

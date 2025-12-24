@@ -1,6 +1,7 @@
 # Specify/Cursor
 .specify
 .cursor
+.claude
 
 # Specs (keep for now, remove if you want to track specs)
 specs

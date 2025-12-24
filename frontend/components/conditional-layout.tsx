@@ -16,8 +16,8 @@ export function ConditionalLayout({ children }: { children: React.ReactNode }) {
   }
 
   // Skip AppShell for auth routes
-  const authRoutes = ["/login", "/register", "/staff/login"];
-  if (authRoutes.some((route) => pathname === route)) {
+  const authRoutes = ["/guest/login", "/register", "/staff/login"];
+  if (authRoutes.some((route) => pathname === route || pathname?.startsWith(route))) {
     return <>{children}</>;
   }
 

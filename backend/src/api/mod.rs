@@ -7,7 +7,7 @@ pub mod rooms;
 
 use axum::{
     middleware as axum_middleware,
-    routing::{get, post},
+    routing::{get, patch, post},
     Router,
 };
 
@@ -76,6 +76,19 @@ pub fn create_router(state: AppState) -> Router {
             middleware::require_guest,
         ));
 
+    // Cleaner routes (requires cleaner auth)
+    let cleaner_routes = Router::new()
+        .route("/rooms", get(rooms::list_cleaner_rooms))
+        .route("/rooms/:id/status", patch(rooms::update_cleaner_room_status))
+        .layer(axum_middleware::from_fn_with_state(
+            state.clone(),
+            middleware::require_cleaner,
+        ))
+        .layer(axum_middleware::from_fn_with_state(
+            state.clone(),
+            middleware::require_auth,
+        ));
+
     // Health check endpoint
     let health_route = Router::new().route("/health", get(health_check));
 
@@ -84,6 +97,7 @@ pub fn create_router(state: AppState) -> Router {
         .nest("/rooms", room_routes)
         .nest("/bookings", booking_routes)
         .nest("/guest/bookings", guest_booking_routes)
+        .nest("/cleaner", cleaner_routes)
         .merge(health_route)
         .with_state(state)
 }

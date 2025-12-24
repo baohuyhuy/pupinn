@@ -6,6 +6,14 @@ mod room_status_transition_tests {
     use hotel_management_backend::models::RoomStatus;
 
     #[test]
+    fn test_available_can_transition_to_dirty() {
+        assert!(
+            RoomStatus::Available.can_transition_to(RoomStatus::Dirty),
+            "Available room should be able to transition to dirty (manual override/admin)"
+        );
+    }
+
+    #[test]
     fn test_available_can_transition_to_occupied() {
         assert!(
             RoomStatus::Available.can_transition_to(RoomStatus::Occupied),
@@ -26,6 +34,14 @@ mod room_status_transition_tests {
         assert!(
             RoomStatus::Occupied.can_transition_to(RoomStatus::Available),
             "Occupied room should be able to transition to available (check-out)"
+        );
+    }
+
+    #[test]
+    fn test_occupied_can_transition_to_dirty() {
+        assert!(
+            RoomStatus::Occupied.can_transition_to(RoomStatus::Dirty),
+            "Occupied room should automatically transition to dirty on check-out"
         );
     }
 
@@ -69,6 +85,26 @@ mod room_status_transition_tests {
             "Same status transition should be valid"
         );
     }
+
+    #[test]
+    fn test_cleaning_workflow_transitions() {
+        assert!(
+            RoomStatus::Dirty.can_transition_to(RoomStatus::Cleaning),
+            "Dirty room should be able to transition to cleaning"
+        );
+        assert!(
+            RoomStatus::Dirty.can_transition_to(RoomStatus::Available),
+            "Dirty room can complete directly to available (edge case)"
+        );
+        assert!(
+            RoomStatus::Cleaning.can_transition_to(RoomStatus::Available),
+            "Cleaning room should be able to transition to available"
+        );
+        assert!(
+            RoomStatus::Cleaning.can_transition_to(RoomStatus::Dirty),
+            "Cleaning room should be able to transition back to dirty for rework"
+        );
+    }
 }
 
 mod room_type_tests {
@@ -109,14 +145,20 @@ mod room_status_serialization_tests {
         let available = RoomStatus::Available;
         let occupied = RoomStatus::Occupied;
         let maintenance = RoomStatus::Maintenance;
+        let dirty = RoomStatus::Dirty;
+        let cleaning = RoomStatus::Cleaning;
 
         let available_json = serde_json::to_string(&available).unwrap();
         let occupied_json = serde_json::to_string(&occupied).unwrap();
         let maintenance_json = serde_json::to_string(&maintenance).unwrap();
+        let dirty_json = serde_json::to_string(&dirty).unwrap();
+        let cleaning_json = serde_json::to_string(&cleaning).unwrap();
 
         assert_eq!(available_json, "\"available\"");
         assert_eq!(occupied_json, "\"occupied\"");
         assert_eq!(maintenance_json, "\"maintenance\"");
+        assert_eq!(dirty_json, "\"dirty\"");
+        assert_eq!(cleaning_json, "\"cleaning\"");
     }
 
     #[test]
@@ -124,9 +166,13 @@ mod room_status_serialization_tests {
         let available: RoomStatus = serde_json::from_str("\"available\"").unwrap();
         let occupied: RoomStatus = serde_json::from_str("\"occupied\"").unwrap();
         let maintenance: RoomStatus = serde_json::from_str("\"maintenance\"").unwrap();
+        let dirty: RoomStatus = serde_json::from_str("\"dirty\"").unwrap();
+        let cleaning: RoomStatus = serde_json::from_str("\"cleaning\"").unwrap();
 
         assert_eq!(available, RoomStatus::Available);
         assert_eq!(occupied, RoomStatus::Occupied);
         assert_eq!(maintenance, RoomStatus::Maintenance);
+        assert_eq!(dirty, RoomStatus::Dirty);
+        assert_eq!(cleaning, RoomStatus::Cleaning);
     }
 }

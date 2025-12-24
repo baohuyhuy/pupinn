@@ -15,6 +15,7 @@ pub enum UserRole {
     Admin,
     Receptionist,
     Guest,
+    Cleaner,
 }
 
 /// User model representing a staff member or guest

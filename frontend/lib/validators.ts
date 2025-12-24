@@ -1,13 +1,13 @@
 import { z } from "zod";
 
 // === Enums ===
-export const UserRole = z.enum(["admin", "receptionist", "guest"]);
+export const UserRole = z.enum(["admin", "receptionist", "guest", "cleaner"]);
 export type UserRole = z.infer<typeof UserRole>;
 
 export const RoomType = z.enum(["single", "double", "suite"]);
 export type RoomType = z.infer<typeof RoomType>;
 
-export const RoomStatus = z.enum(["available", "occupied", "maintenance"]);
+export const RoomStatus = z.enum(["available", "occupied", "maintenance", "dirty", "cleaning"]);
 export type RoomStatus = z.infer<typeof RoomStatus>;
 
 export const BookingStatus = z.enum(["upcoming", "checked_in", "checked_out", "cancelled"]);

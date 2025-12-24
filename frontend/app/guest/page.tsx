@@ -29,7 +29,29 @@ export default function GuestDashboardPage() {
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <Link href="/guest/book">
+        <Link href="/guest/rooms">
+          <Card className="bg-slate-800/50 border-slate-700 hover:border-emerald-500/50 transition-all duration-200 cursor-pointer group h-full">
+            <CardHeader>
+              <div className="w-12 h-12 bg-linear-to-br from-emerald-400 to-emerald-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                <Hotel className="h-6 w-6 text-white" />
+              </div>
+              <CardTitle className="text-slate-100">View Rooms</CardTitle>
+              <CardDescription className="text-slate-400">
+                Browse available rooms and amenities
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button
+                variant="outline"
+                className="w-full border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300"
+              >
+                View Rooms
+              </Button>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/guest/bookings/new">
           <Card className="bg-slate-800/50 border-slate-700 hover:border-amber-500/50 transition-all duration-200 cursor-pointer group h-full">
             <CardHeader>
               <div className="w-12 h-12 bg-linear-to-br from-amber-400 to-amber-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
@@ -45,7 +67,7 @@ export default function GuestDashboardPage() {
                 variant="outline"
                 className="w-full border-amber-500/30 text-amber-400 hover:bg-amber-500/10 hover:text-amber-300"
               >
-                Search Rooms
+                Book Now
               </Button>
             </CardContent>
           </Card>

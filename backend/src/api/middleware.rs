@@ -126,6 +126,11 @@ pub fn get_auth_user(request: &Request) -> Result<AuthUser, AppError> {
         .ok_or_else(|| AppError::Unauthorized("Not authenticated".to_string()))
 }
 
+/// Helper to check if a role is considered staff (admin or receptionist only)
+pub fn is_staff_role(role: UserRole) -> bool {
+    matches!(role, UserRole::Admin | UserRole::Receptionist)
+}
+
 /// Middleware to require guest role
 pub async fn require_guest(
     State(state): State<AppState>,
@@ -205,12 +210,61 @@ pub async fn require_staff(
     })?;
 
     // Check if user is staff (admin or receptionist)
-    if claims.role == UserRole::Guest {
+    if !is_staff_role(claims.role) {
         return Err((
             StatusCode::FORBIDDEN,
             axum::Json(serde_json::json!({
                 "code": "FORBIDDEN",
                 "message": "Staff access required"
+            })),
+        ));
+    }
+
+    // Add user info to request extensions
+    let auth_user = AuthUser {
+        user_id: claims.sub,
+        role: claims.role,
+    };
+    request.extensions_mut().insert(auth_user);
+
+    Ok(next.run(request).await)
+}
+
+/// Middleware to require cleaner role
+pub async fn require_cleaner(
+    State(state): State<AppState>,
+    mut request: Request,
+    next: Next,
+) -> Result<Response, (StatusCode, axum::Json<serde_json::Value>)> {
+    let token = extract_token(&request).ok_or_else(|| {
+        (
+            StatusCode::UNAUTHORIZED,
+            axum::Json(serde_json::json!({
+                "code": "UNAUTHORIZED",
+                "message": "Missing or invalid authorization header"
+            })),
+        )
+    })?;
+
+    let auth_service = AuthService::new(state.pool.clone(), state.jwt_secret.clone());
+
+    let claims = auth_service.validate_token(&token).map_err(|e| {
+        (
+            StatusCode::UNAUTHORIZED,
+            axum::Json(serde_json::json!({
+                "code": "UNAUTHORIZED",
+                "message": e.to_string()
+            })),
+        )
+    })?;
+
+    // Check if user is a cleaner
+    if claims.role != UserRole::Cleaner {
+        return Err((
+            StatusCode::FORBIDDEN,
+            axum::Json(serde_json::json!({
+                "code": "FORBIDDEN",
+                "message": "Cleaner access required"
             })),
         ));
     }

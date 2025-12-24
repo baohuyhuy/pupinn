@@ -73,6 +73,8 @@ export default function GuestBookingsPage() {
   );
 
   // Fetch guest's bookings
+  // Note: Backend automatically filters by current_user.id (guest_id)
+  // Guests can only see their own bookings via /guest/bookings endpoint
   const {
     data: bookings = [],
     isLoading,
@@ -115,8 +117,17 @@ export default function GuestBookingsPage() {
   });
 
   const handleCancelClick = (booking: BookingWithRoom) => {
-    setBookingToCancel(booking);
-    setCancelDialogOpen(true);
+    // Only allow canceling upcoming bookings
+    if (booking.status === "upcoming") {
+      setBookingToCancel(booking);
+      setCancelDialogOpen(true);
+    } else {
+      toast({
+        title: "Cannot Cancel",
+        description: "Only upcoming bookings can be cancelled. Completed bookings cannot be modified.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleConfirmCancel = () => {
@@ -213,7 +224,7 @@ export default function GuestBookingsPage() {
                 ? `You don't have any ${statusLabels[statusFilter]?.toLowerCase()} bookings.`
                 : "You haven't made any reservations yet. Book your first room to get started!"}
             </p>
-            <Link href="/guest/book">
+            <Link href="/guest/bookings/new">
               <Button className="bg-amber-500 hover:bg-amber-600 text-slate-900">
                 <CalendarPlus className="h-4 w-4 mr-2" />
                 Book a Room
@@ -291,6 +302,7 @@ export default function GuestBookingsPage() {
 
                   {/* Actions */}
                   <div className="flex items-center gap-2">
+                    {/* Only allow canceling upcoming bookings (not history) */}
                     {item.status === "upcoming" && (
                       <Button
                         variant="outline"
@@ -301,6 +313,12 @@ export default function GuestBookingsPage() {
                         <X className="h-4 w-4 mr-1" />
                         Cancel
                       </Button>
+                    )}
+                    {/* Show message for history bookings */}
+                    {(item.status === "checked_out" || item.status === "cancelled") && (
+                      <span className="text-xs text-slate-500 italic">
+                        Cannot cancel completed bookings
+                      </span>
                     )}
                   </div>
                 </div>
@@ -316,8 +334,9 @@ export default function GuestBookingsPage() {
           <DialogHeader>
             <DialogTitle>Cancel Booking</DialogTitle>
             <DialogDescription className="text-slate-400">
-              Are you sure you want to cancel this booking? This action cannot
-              be undone.
+              {bookingToCancel?.status === "upcoming" 
+                ? "Are you sure you want to cancel this upcoming booking? This action cannot be undone."
+                : "Only upcoming bookings can be cancelled. Completed bookings (checked out or cancelled) cannot be modified."}
             </DialogDescription>
           </DialogHeader>
 
@@ -357,23 +376,25 @@ export default function GuestBookingsPage() {
               onClick={() => setCancelDialogOpen(false)}
               className="border-slate-600 text-slate-100"
             >
-              Keep Booking
+              {bookingToCancel?.status === "upcoming" ? "Keep Booking" : "Close"}
             </Button>
-            <Button
-              variant="destructive"
-              onClick={handleConfirmCancel}
-              disabled={cancelMutation.isPending}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              {cancelMutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Cancelling...
-                </>
-              ) : (
-                "Cancel Booking"
-              )}
-            </Button>
+            {bookingToCancel?.status === "upcoming" && (
+              <Button
+                variant="destructive"
+                onClick={handleConfirmCancel}
+                disabled={cancelMutation.isPending}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                {cancelMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Cancelling...
+                  </>
+                ) : (
+                  "Cancel Booking"
+                )}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

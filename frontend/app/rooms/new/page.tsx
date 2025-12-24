@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { useAuth } from "@/components/auth-provider";
-import { RoomForm } from "@/components/room-form";
+import { RoomForm } from "@/app/staff/admin/rooms/room-form";
 import { toast } from "@/hooks/use-toast";
 import { type Room } from "@/lib/validators";
 
@@ -18,7 +18,7 @@ export default function NewRoomPage() {
   useEffect(() => {
     if (!isLoading) {
       if (!isAuthenticated) {
-        router.push("/login");
+        router.push("/staff/login");
       } else if (!isAdmin) {
         router.push("/rooms");
       }
