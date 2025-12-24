@@ -35,6 +35,10 @@ pub struct Booking {
     pub status: BookingStatus,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    /// User who created this booking (for guest-created bookings)
+    pub created_by_user_id: Option<Uuid>,
+    /// Source of booking creation: 'staff' or 'guest'
+    pub creation_source: String,
 }
 
 /// New booking for insertion
@@ -46,6 +50,8 @@ pub struct NewBooking<'a> {
     pub room_id: Uuid,
     pub check_in_date: NaiveDate,
     pub check_out_date: NaiveDate,
+    pub created_by_user_id: Option<Uuid>,
+    pub creation_source: &'a str,
 }
 
 /// Booking update changeset

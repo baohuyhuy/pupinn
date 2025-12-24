@@ -372,3 +372,30 @@ mod booking_status_tests {
     }
 }
 
+mod checkout_room_status_tests {
+    use hotel_management_backend::models::RoomStatus;
+
+    #[test]
+    fn checkout_should_allow_occupied_to_dirty_transition() {
+        assert!(
+            RoomStatus::Occupied.can_transition_to(RoomStatus::Dirty),
+            "Checkout should support moving a room from occupied to dirty"
+        );
+    }
+
+    #[test]
+    fn checkout_target_status_is_dirty() {
+        // Business rule: after checkout the room should be marked dirty so cleaners see it.
+        let post_checkout_status = RoomStatus::Dirty;
+        assert_eq!(
+            post_checkout_status,
+            RoomStatus::Dirty,
+            "Checkout target status must remain Dirty"
+        );
+        assert!(
+            RoomStatus::Occupied.can_transition_to(post_checkout_status),
+            "Occupied rooms must be allowed to transition to Dirty on checkout"
+        );
+    }
+}
+

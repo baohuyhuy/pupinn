@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -17,12 +17,14 @@ import {
 } from "@/components/ui/select";
 
 import { useAuth } from "@/components/auth-provider";
+import { RouteGuard } from "@/components/route-guard";
 import { RoomList } from "@/components/room-list";
 import { apiClient } from "@/lib/api-client";
 import { type Room } from "@/lib/validators";
 
-export default function RoomsPage() {
+export default function AdminRoomsPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { isAuthenticated, isLoading: authLoading, isAdmin } = useAuth();
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
@@ -30,7 +32,7 @@ export default function RoomsPage() {
   // Redirect to login if not authenticated
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
-      router.push("/login");
+      router.push("/staff/login");
     }
   }, [authLoading, isAuthenticated, router]);
 
@@ -76,7 +78,8 @@ export default function RoomsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-slate-900 via-slate-800 to-slate-900 p-8">
+    <RouteGuard requiredRole="admin">
+      <div className="min-h-screen bg-linear-to-br from-slate-900 via-slate-800 to-slate-900 p-8">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
@@ -85,7 +88,7 @@ export default function RoomsPage() {
             <p className="text-slate-400 mt-1">Manage hotel room inventory</p>
           </div>
           {isAdmin && (
-            <Link href="/rooms/new">
+            <Link href="/staff/admin/rooms/new">
               <Button className="bg-linear-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-900 font-semibold">
                 <Plus className="h-4 w-4 mr-2" />
                 Add Room
@@ -185,10 +188,22 @@ export default function RoomsPage() {
           rooms={rooms || []}
           isLoading={isLoading}
           error={error as Error | null}
-          onRoomUpdated={() => refetch()}
+          onRoomUpdated={() => {
+            refetch();
+            // Also invalidate other room queries for synchronization
+            queryClient.invalidateQueries({ queryKey: ["rooms"] });
+            queryClient.invalidateQueries({ queryKey: ["cleaner-rooms"] });
+            queryClient.invalidateQueries({ queryKey: ["availableRooms"] });
+            // Invalidate all availableRooms queries regardless of parameters
+            queryClient.invalidateQueries({ predicate: (query) => 
+              query.queryKey[0] === "availableRooms" 
+            });
+          }}
           isAdmin={isAdmin}
         />
       </div>
     </div>
+    </RouteGuard>
   );
 }
+

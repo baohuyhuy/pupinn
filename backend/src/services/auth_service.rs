@@ -10,7 +10,7 @@ use uuid::Uuid;
 
 use crate::db::DbPool;
 use crate::errors::{AppError, AppResult};
-use crate::models::{NewUser, User, UserInfo, UserRole};
+use crate::models::{GuestInfo, NewGuestUser, NewUser, User, UserInfo, UserRole};
 use crate::schema::users;
 
 /// JWT claims structure
@@ -42,6 +42,28 @@ pub struct CreateUserRequest {
     pub username: String,
     pub password: String,
     pub role: UserRole,
+}
+
+/// Guest registration request payload
+#[derive(Debug, Deserialize)]
+pub struct GuestRegisterRequest {
+    pub email: String,
+    pub password: String,
+    pub full_name: String,
+}
+
+/// Guest authentication response payload
+#[derive(Debug, Serialize)]
+pub struct GuestAuthResponse {
+    pub token: String,
+    pub user: GuestInfo,
+}
+
+/// Guest login request payload
+#[derive(Debug, Deserialize)]
+pub struct GuestLoginRequest {
+    pub email: String,
+    pub password: String,
 }
 
 /// Authentication service for user management and JWT operations
@@ -184,9 +206,11 @@ impl AuthService {
         let password_hash = Self::hash_password(&request.password)?;
 
         let new_user = NewUser {
-            username: &request.username,
+            username: Some(&request.username),
             password_hash: &password_hash,
             role: request.role,
+            email: None,
+            full_name: None,
         };
 
         let user: User = diesel::insert_into(users::table)
@@ -195,6 +219,215 @@ impl AuthService {
             .map_err(|e| AppError::DatabaseError(e.to_string()))?;
 
         Ok(user.into())
+    }
+
+    /// Validate password requirements:
+    /// - At least 8 characters
+    /// - At least one letter
+    /// - At least one number
+    pub fn validate_guest_password(password: &str) -> AppResult<()> {
+        if password.len() < 8 {
+            return Err(AppError::ValidationError(
+                "Password must be at least 8 characters".to_string(),
+            ));
+        }
+
+        let has_letter = password.chars().any(|c| c.is_alphabetic());
+        if !has_letter {
+            return Err(AppError::ValidationError(
+                "Password must contain at least one letter".to_string(),
+            ));
+        }
+
+        let has_number = password.chars().any(|c| c.is_numeric());
+        if !has_number {
+            return Err(AppError::ValidationError(
+                "Password must contain at least one number".to_string(),
+            ));
+        }
+
+        Ok(())
+    }
+
+    /// Validate email format (basic validation)
+    pub fn validate_email(email: &str) -> AppResult<()> {
+        // Trim whitespace
+        let email = email.trim();
+
+        if email.is_empty() {
+            return Err(AppError::ValidationError(
+                "Email is required".to_string(),
+            ));
+        }
+
+        // Basic email format validation
+        let parts: Vec<&str> = email.split('@').collect();
+        if parts.len() != 2 {
+            return Err(AppError::ValidationError(
+                "Invalid email format".to_string(),
+            ));
+        }
+
+        let local = parts[0];
+        let domain = parts[1];
+
+        if local.is_empty() || domain.is_empty() {
+            return Err(AppError::ValidationError(
+                "Invalid email format".to_string(),
+            ));
+        }
+
+        if !domain.contains('.') || domain.starts_with('.') || domain.ends_with('.') {
+            return Err(AppError::ValidationError(
+                "Invalid email format".to_string(),
+            ));
+        }
+
+        Ok(())
+    }
+
+    /// Register a new guest user
+    pub fn register_guest(&self, request: &GuestRegisterRequest) -> AppResult<GuestAuthResponse> {
+        // Validate email format
+        Self::validate_email(&request.email)?;
+
+        // Validate password requirements
+        Self::validate_guest_password(&request.password)?;
+
+        // Validate full name
+        let full_name = request.full_name.trim();
+        if full_name.is_empty() {
+            return Err(AppError::ValidationError(
+                "Full name is required".to_string(),
+            ));
+        }
+        if full_name.len() > 100 {
+            return Err(AppError::ValidationError(
+                "Full name must be 100 characters or less".to_string(),
+            ));
+        }
+
+        let mut conn = self
+            .pool
+            .get()
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        // Check if email already exists
+        let email_lower = request.email.trim().to_lowercase();
+        let existing: Option<User> = users::table
+            .filter(users::email.eq(&email_lower))
+            .first(&mut conn)
+            .optional()
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        if existing.is_some() {
+            return Err(AppError::Conflict(
+                "An account with this email already exists".to_string(),
+            ));
+        }
+
+        // Hash password
+        let password_hash = Self::hash_password(&request.password)?;
+
+        // Create new guest user
+        let new_guest = NewGuestUser {
+            email: &email_lower,
+            full_name,
+            password_hash: &password_hash,
+            role: UserRole::Guest,
+        };
+
+        let user: User = diesel::insert_into(users::table)
+            .values(&new_guest)
+            .get_result(&mut conn)
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        // Generate JWT token
+        let token = self.generate_token(&user)?;
+
+        // Convert to GuestInfo
+        let guest_info = GuestInfo::try_from(user)
+            .map_err(|e| AppError::InternalError(e.to_string()))?;
+
+        Ok(GuestAuthResponse {
+            token,
+            user: guest_info,
+        })
+    }
+
+    /// Login a guest user with email and password
+    ///
+    /// # Arguments
+    /// * `request` - Guest login request with email and password
+    ///
+    /// # Returns
+    /// * `GuestAuthResponse` with user info and JWT token on success
+    ///
+    /// # Errors
+    /// * `Unauthorized` - Invalid email or password
+    /// * `Unauthorized` - Account exists but is not a guest account (staff trying guest login)
+    pub fn login_guest(&self, request: &GuestLoginRequest) -> AppResult<GuestAuthResponse> {
+        let mut conn = self
+            .pool
+            .get()
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        // Look up user by email
+        let email_lower = request.email.trim().to_lowercase();
+        let user: User = users::table
+            .filter(users::email.eq(&email_lower))
+            .first(&mut conn)
+            .map_err(|_| AppError::Unauthorized("Invalid email or password".to_string()))?;
+
+        // Verify password
+        if !Self::verify_password(&request.password, &user.password_hash)? {
+            return Err(AppError::Unauthorized(
+                "Invalid email or password".to_string(),
+            ));
+        }
+
+        // Ensure user has guest role (staff should use /auth/login, not /auth/guest/login)
+        if user.role != UserRole::Guest {
+            return Err(AppError::Unauthorized(
+                "Invalid email or password".to_string(),
+            ));
+        }
+
+        // Generate JWT token
+        let token = self.generate_token(&user)?;
+
+        // Convert to GuestInfo
+        let guest_info = GuestInfo::try_from(user)
+            .map_err(|e| AppError::InternalError(e.to_string()))?;
+
+        Ok(GuestAuthResponse {
+            token,
+            user: guest_info,
+        })
+    }
+
+    /// Get guest user by ID (for /auth/guest/me endpoint)
+    ///
+    /// # Arguments
+    /// * `user_id` - The user's UUID
+    ///
+    /// # Returns
+    /// * `GuestInfo` on success
+    ///
+    /// # Errors
+    /// * `NotFound` - User not found
+    /// * `Forbidden` - User is not a guest
+    pub fn get_guest_by_id(&self, user_id: Uuid) -> AppResult<GuestInfo> {
+        let user = self.get_user_by_id(user_id)?;
+
+        // Verify the user is a guest
+        if user.role != UserRole::Guest {
+            return Err(AppError::Forbidden(
+                "Guest access only".to_string(),
+            ));
+        }
+
+        GuestInfo::try_from(user).map_err(|e| AppError::InternalError(e.to_string()))
     }
 }
 

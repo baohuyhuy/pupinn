@@ -7,6 +7,7 @@ use hotel_management_backend::db::create_pool;
 use hotel_management_backend::models::{NewRoom, NewUser, RoomType, UserRole};
 use hotel_management_backend::schema::{rooms, users};
 use hotel_management_backend::services::AuthService;
+use hotel_management_backend::models::RoomStatus;
 
 fn main() {
     dotenv().ok();
@@ -32,6 +33,7 @@ fn seed_users(conn: &mut PgConnection) {
     let users_data = vec![
         ("admin", "admin123", UserRole::Admin),
         ("reception", "reception123", UserRole::Receptionist),
+        ("cleaner", "cleaner123", UserRole::Cleaner),
     ];
 
     for (username, password, role) in users_data {
@@ -47,13 +49,14 @@ fn seed_users(conn: &mut PgConnection) {
             continue;
         }
 
-        let password_hash =
-            AuthService::hash_password(password).expect("Failed to hash password");
+        let password_hash = AuthService::hash_password(password).expect("Failed to hash password");
 
         let new_user = NewUser {
-            username,
+            username: Some(username),
             password_hash: &password_hash,
             role,
+            email: None,
+            full_name: None,
         };
 
         diesel::insert_into(users::table)
@@ -68,16 +71,17 @@ fn seed_users(conn: &mut PgConnection) {
 fn seed_rooms(conn: &mut PgConnection) {
     println!("\nCreating rooms...");
 
+    // Tuple format: (Room Number, Room Type, Initial Status)
     let rooms_data = vec![
-        ("101", RoomType::Single),
-        ("102", RoomType::Single),
-        ("201", RoomType::Double),
-        ("202", RoomType::Double),
-        ("301", RoomType::Suite),
+        ("101", RoomType::Single, RoomStatus::Dirty),     // <--- TEST DATA
+        ("102", RoomType::Single, RoomStatus::Dirty),     // <--- TEST DATA
+        ("201", RoomType::Double, RoomStatus::Available),
+        ("202", RoomType::Double, RoomStatus::Occupied),
+        ("301", RoomType::Suite,  RoomStatus::Maintenance),
     ];
 
-    for (number, room_type) in rooms_data {
-        // Check if room already exists
+    for (number, room_type, status) in rooms_data {
+        // 1. Check if room exists
         let existing: Option<hotel_management_backend::models::Room> = rooms::table
             .filter(rooms::number.eq(number))
             .first(conn)
@@ -85,10 +89,17 @@ fn seed_rooms(conn: &mut PgConnection) {
             .expect("Failed to query rooms");
 
         if existing.is_some() {
-            println!("  ⏭️  Room '{}' already exists, skipping", number);
+            // OPTIONAL: Force update existing rooms to the new status
+            diesel::update(rooms::table.filter(rooms::number.eq(number)))
+                .set(rooms::status.eq(status))
+                .execute(conn)
+                .expect("Failed to update room status");
+                
+            println!("  ⏭️  Room '{}' exists. Updated status to {:?}", number, status);
             continue;
         }
 
+        // 2. Create the room (defaults to Available usually)
         let new_room = NewRoom { number, room_type };
 
         diesel::insert_into(rooms::table)
@@ -96,7 +107,12 @@ fn seed_rooms(conn: &mut PgConnection) {
             .execute(conn)
             .expect("Failed to insert room");
 
-        println!("  ✅ Created room '{}' ({:?})", number, room_type);
+        // 3. IMMEDIATELY update the status to what we want
+        diesel::update(rooms::table.filter(rooms::number.eq(number)))
+            .set(rooms::status.eq(status))
+            .execute(conn)
+            .expect("Failed to set initial room status");
+
+        println!("  ✅ Created room '{}' [{:?}] -> {:?}", number, room_type, status);
     }
 }
-

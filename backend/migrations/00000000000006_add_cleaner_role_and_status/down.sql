@@ -1,0 +1,39 @@
+-- Rollback: Remove cleaner role and room cleaning statuses
+-- 
+-- Note: PostgreSQL does not support removing enum values directly.
+-- To fully rollback this migration, you would need to:
+-- 1. Remove all data that uses these enum values
+-- 2. Recreate the enum type without these values
+-- 3. Reassign existing data to compatible values
+--
+-- This is a complex operation that should be performed manually.
+-- For safety, we document the rollback process here but do not
+-- provide an automatic rollback script.
+--
+-- Manual rollback steps:
+-- 1. Update all users with role 'cleaner' to another role (e.g., 'receptionist')
+--    UPDATE users SET role = 'receptionist' WHERE role = 'cleaner';
+--
+-- 2. Update all rooms with status 'dirty' or 'cleaning' to 'available'
+--    UPDATE rooms SET status = 'available' WHERE status IN ('dirty', 'cleaning');
+--
+-- 3. Recreate the enum types without the new values:
+--    -- For user_role, create new type without 'cleaner'
+--    CREATE TYPE user_role_new AS ENUM ('admin', 'receptionist', 'guest');
+--    ALTER TABLE users ALTER COLUMN role TYPE user_role_new USING role::text::user_role_new;
+--    DROP TYPE user_role;
+--    ALTER TYPE user_role_new RENAME TO user_role;
+--
+--    -- For room_status, create new type without 'dirty' and 'cleaning'
+--    CREATE TYPE room_status_new AS ENUM ('available', 'occupied', 'maintenance');
+--    ALTER TABLE rooms ALTER COLUMN status TYPE room_status_new USING status::text::room_status_new;
+--    DROP TYPE room_status;
+--    ALTER TYPE room_status_new RENAME TO room_status;
+--
+-- WARNING: This rollback will result in data loss and should only be performed
+-- in development or if you have backups of all affected data.
+
+-- Since automatic rollback is not safe, this file intentionally contains
+-- no executable SQL. The migration can be marked as rolled back in the
+-- diesel migration tracking, but the enum values will remain in the database.
+

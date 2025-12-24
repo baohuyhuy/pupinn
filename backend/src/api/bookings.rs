@@ -24,6 +24,7 @@ pub struct CreateBookingDto {
 
 /// Update booking request DTO
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 pub struct UpdateBookingDto {
     pub guest_name: Option<String>,
     pub check_in_date: Option<NaiveDate>,

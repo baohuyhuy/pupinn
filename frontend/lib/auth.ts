@@ -1,6 +1,19 @@
 const TOKEN_KEY = 'hms_token';
 const USER_KEY = 'hms_user';
 
+/**
+ * Routes that should not display any sidebar or navigation
+ */
+export const AUTH_ROUTES = ['/login', '/register', '/staff/login'] as const;
+
+/**
+ * Check if a given pathname is an auth route
+ */
+export function isAuthRoute(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return AUTH_ROUTES.includes(pathname as typeof AUTH_ROUTES[number]);
+}
+
 export interface User {
   id: string;
   username: string;

@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dialog";
 
 import { useAuth } from "@/components/auth-provider";
+import { RouteGuard } from "@/components/route-guard";
 import { BookingList, type BookingWithRoom } from "@/components/booking-list";
 import {
   BookingFilters,
@@ -32,13 +33,12 @@ const defaultFilters: BookingFiltersState = {
   toDate: "",
 };
 
-export default function BookingsPage() {
+export default function AdminBookingsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [filters, setFilters] = useState<BookingFiltersState>(defaultFilters);
 
-  // Dialog states for confirmations
   const [checkInDialog, setCheckInDialog] = useState<{
     open: boolean;
     bookingId: string | null;
@@ -53,14 +53,12 @@ export default function BookingsPage() {
     bookingId: string | null;
   }>({ open: false, bookingId: null });
 
-  // Redirect to login if not authenticated
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
-      router.push("/login");
+      router.push("/staff/login");
     }
   }, [authLoading, isAuthenticated, router]);
 
-  // Fetch bookings with filters
   const {
     data: bookings,
     isLoading,
@@ -89,7 +87,6 @@ export default function BookingsPage() {
     enabled: isAuthenticated,
   });
 
-  // Check-in mutation
   const checkInMutation = useMutation({
     mutationFn: async ({
       bookingId,
@@ -105,6 +102,11 @@ export default function BookingsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bookings"] });
+      queryClient.invalidateQueries({ queryKey: ["rooms"] });
+      // Invalidate all availableRooms queries for synchronization
+      queryClient.invalidateQueries({ predicate: (query) => 
+        query.queryKey[0] === "availableRooms" 
+      });
       toast({
         title: "Check-in Successful",
         description: "Guest has been checked in.",
@@ -113,7 +115,6 @@ export default function BookingsPage() {
     },
     onError: (error: Error) => {
       const message = getErrorMessage(error);
-      // Check if it's an early check-in warning
       if (message.includes("Check-in date is")) {
         setCheckInDialog((prev) => ({ ...prev, isEarly: true }));
       } else {
@@ -126,7 +127,6 @@ export default function BookingsPage() {
     },
   });
 
-  // Check-out mutation
   const checkOutMutation = useMutation({
     mutationFn: async (bookingId: string) => {
       const response = await apiClient.post(`/bookings/${bookingId}/check-out`);
@@ -134,6 +134,11 @@ export default function BookingsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bookings"] });
+      queryClient.invalidateQueries({ queryKey: ["rooms"] });
+      // Invalidate all availableRooms queries for synchronization
+      queryClient.invalidateQueries({ predicate: (query) => 
+        query.queryKey[0] === "availableRooms" 
+      });
       toast({
         title: "Check-out Successful",
         description: "Guest has been checked out. Room is now available.",
@@ -141,15 +146,25 @@ export default function BookingsPage() {
       setCheckOutDialog({ open: false, bookingId: null });
     },
     onError: (error: Error) => {
-      toast({
-        title: "Check-out Failed",
-        description: getErrorMessage(error),
-        variant: "destructive",
-      });
+      const message = getErrorMessage(error);
+      if (message.includes("CheckOut")) {
+        queryClient.invalidateQueries({ queryKey: ["bookings-rooms"] });
+        toast({
+          title: "Already Checked Out",
+          description: "The guest has already been checked out.",
+          className: "bg-blue-500 text-white border-none",
+        });
+        setCheckOutDialog({ open: false, bookingId: null });
+      } else {
+        toast({
+          title: "Check-out Failed",
+          description: getErrorMessage(error),
+          variant: "destructive",
+        });
+      }
     },
   });
 
-  // Cancel mutation
   const cancelMutation = useMutation({
     mutationFn: async (bookingId: string) => {
       const response = await apiClient.post(`/bookings/${bookingId}/cancel`);
@@ -157,6 +172,11 @@ export default function BookingsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bookings"] });
+      queryClient.invalidateQueries({ queryKey: ["rooms"] });
+      // Invalidate all availableRooms queries for synchronization
+      queryClient.invalidateQueries({ predicate: (query) => 
+        query.queryKey[0] === "availableRooms" 
+      });
       toast({
         title: "Booking Cancelled",
         description: "The booking has been cancelled.",
@@ -172,7 +192,6 @@ export default function BookingsPage() {
     },
   });
 
-  // Handlers
   const handleCheckIn = (bookingId: string) => {
     setCheckInDialog({ open: true, bookingId, isEarly: false });
   };
@@ -219,15 +238,15 @@ export default function BookingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-slate-900 via-slate-800 to-slate-900 p-8">
+    <RouteGuard requiredRole="admin">
+      <div className="min-h-screen bg-linear-to-br from-slate-900 via-slate-800 to-slate-900 p-8">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold text-slate-100">Bookings</h1>
             <p className="text-slate-400 mt-1">Manage guest reservations</p>
           </div>
-          <Link href="/bookings/new">
+          <Link href="/staff/admin/bookings/new">
             <Button className="bg-linear-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-900 font-semibold">
               <Plus className="h-4 w-4 mr-2" />
               New Booking
@@ -235,14 +254,12 @@ export default function BookingsPage() {
           </Link>
         </div>
 
-        {/* Filters */}
         <BookingFilters
           filters={filters}
           onFiltersChange={setFilters}
           onClearFilters={() => setFilters(defaultFilters)}
         />
 
-        {/* Bookings List */}
         <BookingList
           bookings={bookings || []}
           isLoading={isLoading}
@@ -250,10 +267,10 @@ export default function BookingsPage() {
           onCheckIn={handleCheckIn}
           onCheckOut={handleCheckOut}
           onCancel={handleCancel}
+          basePath="/staff/admin/bookings"
         />
       </div>
 
-      {/* Check-in Confirmation Dialog */}
       <Dialog
         open={checkInDialog.open}
         onOpenChange={(open) =>
@@ -300,7 +317,6 @@ export default function BookingsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Check-out Confirmation Dialog */}
       <Dialog
         open={checkOutDialog.open}
         onOpenChange={(open) => setCheckOutDialog({ open, bookingId: null })}
@@ -336,7 +352,6 @@ export default function BookingsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Cancel Confirmation Dialog */}
       <Dialog
         open={cancelDialog.open}
         onOpenChange={(open) => setCancelDialog({ open, bookingId: null })}
@@ -368,5 +383,7 @@ export default function BookingsPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </RouteGuard>
   );
 }
+

@@ -16,7 +16,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { getErrorMessage } from "@/lib/api-client";
-import { PawPrint } from "lucide-react";
+import { PawPrint, Building2 } from "lucide-react";
+import Link from "next/link";
 
 const loginSchema = z.object({
   username: z.string().min(3, "Username must be at least 3 characters"),
@@ -25,7 +26,7 @@ const loginSchema = z.object({
 
 type LoginFormData = z.infer<typeof loginSchema>;
 
-export default function LoginPage() {
+export default function StaffLoginPage() {
   const { login, isLoading } = useAuth();
   const [error, setError] = useState<string | null>(null);
 
@@ -52,14 +53,14 @@ export default function LoginPage() {
 
       <Card className="w-full max-w-md relative z-10 bg-slate-800/80 backdrop-blur-sm border-slate-700 shadow-2xl">
         <CardHeader className="space-y-2 text-center">
-          <div className="mx-auto w-16 h-16 bg-linear-to-br from-amber-400 to-amber-600 rounded-2xl flex items-center justify-center mb-2 shadow-lg">
-            <PawPrint className="h-8 w-8 text-slate-900" />
+          <div className="mx-auto w-16 h-16 bg-linear-to-br from-blue-400 to-blue-600 rounded-2xl flex items-center justify-center mb-2 shadow-lg">
+            <Building2 className="h-8 w-8 text-white" />
           </div>
           <CardTitle className="text-2xl font-bold text-slate-100">
-            Pupinn Hotel Console
+            Staff Portal
           </CardTitle>
           <CardDescription className="text-slate-400">
-            Sign in to access the dashboard
+            Sign in to access the hotel console
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -78,7 +79,7 @@ export default function LoginPage() {
                 id="username"
                 type="text"
                 placeholder="Enter your username"
-                className="bg-slate-700/50 border-slate-600 text-slate-100 placeholder:text-slate-500 focus:border-amber-500 focus:ring-amber-500/20"
+                className="bg-slate-700/50 border-slate-600 text-slate-100 placeholder:text-slate-500 focus:border-blue-500 focus:ring-blue-500/20"
                 {...register("username")}
               />
               {errors.username && (
@@ -96,7 +97,7 @@ export default function LoginPage() {
                 id="password"
                 type="password"
                 placeholder="Enter your password"
-                className="bg-slate-700/50 border-slate-600 text-slate-100 placeholder:text-slate-500 focus:border-amber-500 focus:ring-amber-500/20"
+                className="bg-slate-700/50 border-slate-600 text-slate-100 placeholder:text-slate-500 focus:border-blue-500 focus:ring-blue-500/20"
                 {...register("password")}
               />
               {errors.password && (
@@ -108,7 +109,7 @@ export default function LoginPage() {
 
             <Button
               type="submit"
-              className="w-full bg-linear-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-900 font-semibold shadow-lg shadow-amber-500/25 transition-all duration-200"
+              className="w-full bg-linear-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-semibold shadow-lg shadow-blue-500/25 transition-all duration-200"
               disabled={isLoading}
             >
               {isLoading ? (
@@ -142,9 +143,35 @@ export default function LoginPage() {
                 admin / admin123 or reception / reception123
               </p>
             </div>
+
+            <div className="relative my-4">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-slate-700" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-slate-800/80 px-2 text-slate-500">Or</span>
+              </div>
+            </div>
+
+            <div className="text-center text-sm">
+              <p className="text-slate-400">
+                Guest looking to book a room?{" "}
+                <Link
+                  href="/guest/login"
+                  className="text-amber-400 hover:text-amber-300 font-medium transition-colors"
+                >
+                  Guest login
+                </Link>
+              </p>
+            </div>
           </form>
         </CardContent>
       </Card>
+
+      <div className="fixed bottom-4 left-4 flex items-center gap-2 text-slate-500 text-sm">
+        <PawPrint className="h-4 w-4" />
+        <span>Pupinn Hotel Management</span>
+      </div>
     </div>
   );
 }

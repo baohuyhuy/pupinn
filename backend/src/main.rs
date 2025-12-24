@@ -62,7 +62,9 @@ async fn main() {
         .allow_credentials(true);
 
     // Build router
-    let app = create_router(state)
+    let api_router = create_router(state);
+    let app = axum::Router::new()
+        .nest("/api", api_router)
         .layer(cors)
         .layer(TraceLayer::new_for_http());
 

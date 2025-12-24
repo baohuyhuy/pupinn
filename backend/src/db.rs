@@ -6,6 +6,7 @@ use std::time::Duration;
 pub type DbPool = Pool<ConnectionManager<PgConnection>>;
 
 /// Type alias for a pooled connection
+#[allow(dead_code)]
 pub type DbConn = PooledConnection<ConnectionManager<PgConnection>>;
 
 /// Create a new database connection pool
@@ -37,6 +38,7 @@ pub fn create_pool(database_url: &str) -> DbPool {
 ///
 /// # Returns
 /// A pooled database connection or error
+#[allow(dead_code)]
 pub fn get_conn(pool: &DbPool) -> Result<DbConn, r2d2::PoolError> {
     pool.get()
 }

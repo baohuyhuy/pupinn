@@ -6,7 +6,6 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
-  Calendar,
   Home,
   LogOut,
   LogIn,
@@ -61,7 +60,8 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      router.push("/login");
+      // Redirect to guest login by default
+      router.push("/guest/login");
     }
   }, [isLoading, isAuthenticated, router]);
 
@@ -313,47 +313,82 @@ export default function DashboardPage() {
         Quick Actions
       </h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        <Link href="/bookings/new">
-          <Card className="bg-slate-800/80 border-slate-700 hover:border-amber-500/50 transition-colors cursor-pointer group">
-            <CardHeader>
-              <div className="w-12 h-12 bg-linear-to-br from-amber-400 to-amber-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                <NotebookPen className="h-6 w-6 text-slate-900" />
-              </div>
-              <CardTitle className="text-slate-100">New Booking</CardTitle>
-              <CardDescription className="text-slate-400">
-                Create a new guest reservation
-              </CardDescription>
-            </CardHeader>
-          </Card>
-        </Link>
+        {user?.role === "admin" && (
+          <>
+            <Link href="/staff/admin/bookings/new">
+              <Card className="bg-slate-800/80 border-slate-700 hover:border-amber-500/50 transition-colors cursor-pointer group">
+                <CardHeader>
+                  <div className="w-12 h-12 bg-linear-to-br from-amber-400 to-amber-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                    <NotebookPen className="h-6 w-6 text-slate-900" />
+                  </div>
+                  <CardTitle className="text-slate-100">New Booking</CardTitle>
+                  <CardDescription className="text-slate-400">
+                    Create a new guest reservation
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+            </Link>
 
-        <Link href="/bookings">
-          <Card className="bg-slate-800/80 border-slate-700 hover:border-blue-500/50 transition-colors cursor-pointer group">
-            <CardHeader>
-              <div className="w-12 h-12 bg-linear-to-br from-blue-400 to-blue-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                <ListChecks className="h-6 w-6 text-white" />
-              </div>
-              <CardTitle className="text-slate-100">View Bookings</CardTitle>
-              <CardDescription className="text-slate-400">
-                Manage existing reservations
-              </CardDescription>
-            </CardHeader>
-          </Card>
-        </Link>
+            <Link href="/staff/admin/bookings">
+              <Card className="bg-slate-800/80 border-slate-700 hover:border-blue-500/50 transition-colors cursor-pointer group">
+                <CardHeader>
+                  <div className="w-12 h-12 bg-linear-to-br from-blue-400 to-blue-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                    <ListChecks className="h-6 w-6 text-white" />
+                  </div>
+                  <CardTitle className="text-slate-100">View Bookings</CardTitle>
+                  <CardDescription className="text-slate-400">
+                    Manage existing reservations
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+            </Link>
 
-        <Link href="/rooms">
-          <Card className="bg-slate-800/80 border-slate-700 hover:border-emerald-500/50 transition-colors cursor-pointer group">
-            <CardHeader>
-              <div className="w-12 h-12 bg-linear-to-br from-emerald-400 to-emerald-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                <Home className="h-6 w-6 text-white" />
-              </div>
-              <CardTitle className="text-slate-100">Room Management</CardTitle>
-              <CardDescription className="text-slate-400">
-                View and manage room inventory
-              </CardDescription>
-            </CardHeader>
-          </Card>
-        </Link>
+            <Link href="/staff/admin/rooms">
+              <Card className="bg-slate-800/80 border-slate-700 hover:border-emerald-500/50 transition-colors cursor-pointer group">
+                <CardHeader>
+                  <div className="w-12 h-12 bg-linear-to-br from-emerald-400 to-emerald-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                    <Home className="h-6 w-6 text-white" />
+                  </div>
+                  <CardTitle className="text-slate-100">Room Management</CardTitle>
+                  <CardDescription className="text-slate-400">
+                    View and manage room inventory
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+            </Link>
+          </>
+        )}
+        {user?.role === "receptionist" && (
+          <>
+            <Link href="/staff/receptionist/bookings/new">
+              <Card className="bg-slate-800/80 border-slate-700 hover:border-amber-500/50 transition-colors cursor-pointer group">
+                <CardHeader>
+                  <div className="w-12 h-12 bg-linear-to-br from-amber-400 to-amber-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                    <NotebookPen className="h-6 w-6 text-slate-900" />
+                  </div>
+                  <CardTitle className="text-slate-100">New Booking</CardTitle>
+                  <CardDescription className="text-slate-400">
+                    Create a new guest reservation
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+            </Link>
+
+            <Link href="/staff/receptionist/bookings">
+              <Card className="bg-slate-800/80 border-slate-700 hover:border-blue-500/50 transition-colors cursor-pointer group">
+                <CardHeader>
+                  <div className="w-12 h-12 bg-linear-to-br from-blue-400 to-blue-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                    <ListChecks className="h-6 w-6 text-white" />
+                  </div>
+                  <CardTitle className="text-slate-100">View Bookings</CardTitle>
+                  <CardDescription className="text-slate-400">
+                    Manage existing reservations
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+            </Link>
+          </>
+        )}
       </div>
     </div>
   );

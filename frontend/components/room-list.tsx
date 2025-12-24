@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Home, Wrench, User, Edit } from "lucide-react";
+import { Home, Wrench, User, Edit, Sparkles, AlertCircle, HelpCircle } from "lucide-react"; // Added missing icons
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -21,7 +21,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-import { RoomForm } from "./room-form";
+import { RoomForm } from "@/app/staff/admin/rooms/room-form";
 import { type Room, type RoomStatus, type RoomType } from "@/lib/validators";
 
 interface RoomListProps {
@@ -41,9 +41,9 @@ export function RoomList({
 }: RoomListProps) {
   const [editingRoom, setEditingRoom] = useState<Room | null>(null);
 
-  const getStatusBadge = (status: RoomStatus) => {
+  const getStatusBadge = (status: RoomStatus | string) => {
     const variants: Record<
-      RoomStatus,
+      string,
       { className: string; label: string; icon: React.ReactNode }
     > = {
       available: {
@@ -57,27 +57,44 @@ export function RoomList({
         icon: <User className="h-3 w-3 mr-1" />,
       },
       maintenance: {
-        className: "bg-amber-500 hover:bg-amber-600",
+        className: "bg-slate-500 hover:bg-slate-600", // Changed to slate for better visibility
         label: "Maintenance",
         icon: <Wrench className="h-3 w-3 mr-1" />,
       },
+      dirty: {
+        className: "bg-red-500 hover:bg-red-600",
+        label: "Dirty",
+        icon: <AlertCircle className="h-3 w-3 mr-1" />,
+      },
+      cleaning: {
+        className: "bg-amber-500 hover:bg-amber-600",
+        label: "Cleaning",
+        icon: <Sparkles className="h-3 w-3 mr-1" />,
+      },
     };
-    const variant = variants[status];
+
+    // 👇 SAFETY CHECK: Fallback if status is still unknown
+    const variant = variants[status] || {
+      className: "bg-gray-500",
+      label: status || "Unknown",
+      icon: <HelpCircle className="h-3 w-3 mr-1" />,
+    };
+
     return (
-      <Badge className={`${variant.className}`}>
+      <Badge className={`${variant.className} text-white`}>
         {variant.icon}
         {variant.label}
       </Badge>
     );
   };
 
-  const getRoomTypeLabel = (type: RoomType) => {
-    const labels: Record<RoomType, string> = {
+  const getRoomTypeLabel = (type: RoomType | string) => {
+    const labels: Record<string, string> = {
       single: "Single",
       double: "Double",
       suite: "Suite",
     };
-    return labels[type];
+    return labels[type] || type;
   };
 
   const handleEditSuccess = () => {

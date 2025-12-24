@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { useAuth } from "@/components/auth-provider";
-import { RoomForm } from "@/components/room-form";
+import { RouteGuard } from "@/components/route-guard";
+import { RoomForm } from "@/app/staff/admin/rooms/room-form";
 import { toast } from "@/hooks/use-toast";
 import { type Room } from "@/lib/validators";
 
@@ -18,7 +19,7 @@ export default function NewRoomPage() {
   useEffect(() => {
     if (!isLoading) {
       if (!isAuthenticated) {
-        router.push("/login");
+        router.push("/staff/login");
       } else if (!isAdmin) {
         router.push("/rooms");
       }
@@ -40,12 +41,16 @@ export default function NewRoomPage() {
   const handleSuccess = (room: Room) => {
     // Invalidate the rooms query to trigger a refetch
     queryClient.invalidateQueries({ queryKey: ["rooms"] });
+    // Invalidate all availableRooms queries for synchronization
+    queryClient.invalidateQueries({ predicate: (query) => 
+      query.queryKey[0] === "availableRooms" 
+    });
 
     toast({
       title: "Room Created",
       description: `Room ${room.number} has been added successfully.`,
     });
-    router.push("/rooms");
+    router.push("/staff/admin/rooms");
   };
 
   const handleCancel = () => {
@@ -53,17 +58,20 @@ export default function NewRoomPage() {
   };
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-slate-900 via-slate-800 to-slate-900 p-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-slate-100">Add New Room</h1>
-          <p className="text-slate-400 mt-2">
-            Add a new room to the hotel inventory
-          </p>
-        </div>
+    <RouteGuard requiredRole="admin">
+      <div className="min-h-screen bg-linear-to-br from-slate-900 via-slate-800 to-slate-900 p-8">
+        <div className="max-w-4xl mx-auto">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-slate-100">Add New Room</h1>
+            <p className="text-slate-400 mt-2">
+              Add a new room to the hotel inventory
+            </p>
+          </div>
 
-        <RoomForm onSuccess={handleSuccess} onCancel={handleCancel} />
+          <RoomForm onSuccess={handleSuccess} onCancel={handleCancel} />
+        </div>
       </div>
-    </div>
+    </RouteGuard>
   );
 }
+
