@@ -1,5 +1,7 @@
 use diesel::prelude::*;
 use dotenvy::dotenv;
+use bigdecimal::BigDecimal;
+use std::str::FromStr;
 use std::env;
 
 // Import from the main crate
@@ -44,12 +46,22 @@ fn seed_users(conn: &mut PgConnection) {
             .optional()
             .expect("Failed to query users");
 
-        if existing.is_some() {
-            println!("  ⏭️  User '{}' already exists, skipping", username);
+        let password_hash = AuthService::hash_password(password).expect("Failed to hash password");
+
+        if let Some(_existing_user) = existing {
+            // User exists - update password and role to ensure they match seed data
+            diesel::update(users::table.filter(users::username.eq(username)))
+                .set((
+                    users::password_hash.eq(&password_hash),
+                    users::role.eq(role),
+                    users::deactivated_at.eq(None::<chrono::DateTime<chrono::Utc>>),
+                ))
+                .execute(conn)
+                .expect("Failed to update user");
+            
+            println!("  🔄 Updated user '{}' with role {:?} and reset password", username, role);
             continue;
         }
-
-        let password_hash = AuthService::hash_password(password).expect("Failed to hash password");
 
         let new_user = NewUser {
             username: Some(username),
@@ -57,6 +69,8 @@ fn seed_users(conn: &mut PgConnection) {
             role,
             email: None,
             full_name: None,
+            id_number: None,
+            phone: None,
         };
 
         diesel::insert_into(users::table)
@@ -100,7 +114,13 @@ fn seed_rooms(conn: &mut PgConnection) {
         }
 
         // 2. Create the room (defaults to Available usually)
-        let new_room = NewRoom { number, room_type };
+        // Set default price based on room type
+        let price = match room_type {
+            RoomType::Single => BigDecimal::from_str("100.00").unwrap(),
+            RoomType::Double => BigDecimal::from_str("150.00").unwrap(),
+            RoomType::Suite => BigDecimal::from_str("250.00").unwrap(),
+        };
+        let new_room = NewRoom { number, room_type, price };
 
         diesel::insert_into(rooms::table)
             .values(&new_room)

@@ -4,6 +4,7 @@ use diesel_derive_enum::DbEnum;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use bigdecimal::BigDecimal;
 use crate::schema::bookings;
 
 use super::Room;
@@ -21,7 +22,7 @@ pub enum BookingStatus {
 }
 
 /// Booking model representing a guest reservation
-#[derive(Debug, Clone, Queryable, Identifiable, Selectable, Associations, Serialize)]
+#[derive(Debug, Clone, Queryable, Identifiable, Associations, Serialize, Selectable)]
 #[diesel(table_name = bookings)]
 #[diesel(belongs_to(Room))]
 #[diesel(check_for_backend(diesel::pg::Pg))]
@@ -39,6 +40,8 @@ pub struct Booking {
     pub created_by_user_id: Option<Uuid>,
     /// Source of booking creation: 'staff' or 'guest'
     pub creation_source: String,
+    /// Booking price/revenue
+    pub price: BigDecimal,
 }
 
 /// New booking for insertion
@@ -52,6 +55,7 @@ pub struct NewBooking<'a> {
     pub check_out_date: NaiveDate,
     pub created_by_user_id: Option<Uuid>,
     pub creation_source: &'a str,
+    pub price: BigDecimal,
 }
 
 /// Booking update changeset
@@ -62,6 +66,7 @@ pub struct UpdateBooking {
     pub check_in_date: Option<NaiveDate>,
     pub check_out_date: Option<NaiveDate>,
     pub status: Option<BookingStatus>,
+    pub price: Option<BigDecimal>,
 }
 
 /// Booking with room details for API responses

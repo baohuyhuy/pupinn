@@ -1,12 +1,16 @@
 use chrono::{NaiveDate, Utc};
 use diesel::prelude::*;
+use diesel::dsl::{count, sum, avg};
 use rand::Rng;
+use bigdecimal::BigDecimal;
+use std::str::FromStr;
+use serde::Serialize;
 use uuid::Uuid;
 
 use crate::db::DbPool;
 use crate::errors::{AppError, AppResult};
 use crate::models::{
-    Booking, BookingStatus, BookingWithRoom, NewBooking, Room, RoomStatus, UpdateBooking,
+    Booking, BookingStatus, BookingWithRoom, NewBooking, Room, RoomStatus, RoomType, UpdateBooking,
 };
 use crate::schema::{bookings, rooms};
 use crate::services::RoomService;
@@ -16,10 +20,30 @@ pub struct BookingService {
     pool: DbPool,
 }
 
+/// Financial metrics for a room
+#[derive(Debug, Clone, Serialize)]
+pub struct RoomFinancials {
+    pub room_id: Uuid,
+    pub total_revenue: BigDecimal,
+    pub booking_count: i64,
+    pub average_revenue: Option<BigDecimal>,
+    pub occupancy_rate: f64,
+}
+
 impl BookingService {
     /// Create a new BookingService instance
     pub fn new(pool: DbPool) -> Self {
         Self { pool }
+    }
+
+    /// Get default price for a room type
+    /// Returns the standard nightly rate for each room type
+    fn get_default_price_for_room_type(room_type: RoomType) -> BigDecimal {
+        match room_type {
+            RoomType::Single => BigDecimal::from_str("100.00").unwrap(),
+            RoomType::Double => BigDecimal::from_str("150.00").unwrap(),
+            RoomType::Suite => BigDecimal::from_str("250.00").unwrap(),
+        }
     }
 
     /// Generate a unique booking reference in format BK-YYYYMMDD-XXXX
@@ -130,6 +154,7 @@ impl BookingService {
         room_id: Uuid,
         check_in_date: NaiveDate,
         check_out_date: NaiveDate,
+        price: Option<BigDecimal>,
     ) -> AppResult<Booking> {
         // Validate dates
         self.validate_dates(check_in_date, check_out_date)?;
@@ -177,6 +202,13 @@ impl BookingService {
             ));
         }
 
+        // Calculate price: use provided price, or calculate from room.price
+        let booking_price = price.unwrap_or_else(|| {
+            let nights = (check_out_date - check_in_date).num_days();
+            &room.price * BigDecimal::from(nights.max(1))
+        });
+
+        // println!("Room price: {}", room.price);
         let new_booking = NewBooking {
             reference: &reference,
             guest_name: guest_name.trim(),
@@ -185,6 +217,7 @@ impl BookingService {
             check_out_date,
             created_by_user_id: None,
             creation_source: "staff",
+            price: booking_price,
         };
 
         diesel::insert_into(bookings::table)
@@ -444,6 +477,7 @@ impl BookingService {
     /// * `room_id` - The room to book
     /// * `check_in_date` - Check-in date
     /// * `check_out_date` - Check-out date
+    /// * `price` - Optional booking price
     pub fn create_guest_booking(
         &self,
         user_id: Uuid,
@@ -451,6 +485,7 @@ impl BookingService {
         room_id: Uuid,
         check_in_date: NaiveDate,
         check_out_date: NaiveDate,
+        price: Option<BigDecimal>,
     ) -> AppResult<BookingWithRoom> {
         // Validate dates
         self.validate_dates(check_in_date, check_out_date)?;
@@ -498,6 +533,12 @@ impl BookingService {
             ));
         }
 
+        // Calculate price: use provided price, or calculate from room.price
+        let booking_price = price.unwrap_or_else(|| {
+            let nights = (check_out_date - check_in_date).num_days();
+            &room.price * BigDecimal::from(nights.max(1))
+        });
+
         let new_booking = NewBooking {
             reference: &reference,
             guest_name: guest_name.trim(),
@@ -506,6 +547,7 @@ impl BookingService {
             check_out_date,
             created_by_user_id: Some(user_id),
             creation_source: "guest",
+            price: booking_price,
         };
 
         let booking: Booking = diesel::insert_into(bookings::table)
@@ -537,7 +579,7 @@ impl BookingService {
             .map_err(|e| AppError::DatabaseError(e.to_string()))?;
 
         let mut query = bookings::table
-            .filter(bookings::created_by_user_id.eq(user_id))
+            .filter(bookings::created_by_user_id.eq(Some(user_id)))
             .into_boxed();
 
         if let Some(status) = status_filter {
@@ -635,6 +677,105 @@ impl BookingService {
             .set(&update)
             .get_result(&mut conn)
             .map_err(|e| AppError::DatabaseError(e.to_string()))
+    }
+
+    /// Calculate financial metrics for a room
+    ///
+    /// # Arguments
+    /// * `room_id` - The room ID
+    /// * `start_date` - Optional start date filter (inclusive)
+    /// * `end_date` - Optional end date filter (inclusive, based on check_out_date)
+    ///
+    /// # Returns
+    /// * `RoomFinancials` with revenue, booking count, average revenue, and occupancy rate
+    pub fn calculate_room_financials(
+        &self,
+        room_id: Uuid,
+        start_date: Option<NaiveDate>,
+        end_date: Option<NaiveDate>,
+    ) -> AppResult<RoomFinancials> {
+        let mut conn = self
+            .pool
+            .get()
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        // Helper function to build the base query
+        let build_query = || {
+            let mut query = bookings::table
+                .into_boxed()
+                .filter(bookings::room_id.eq(room_id))
+                .filter(bookings::status.eq(BookingStatus::CheckedOut));
+
+            // Apply date range filter (based on check_out_date)
+            if let Some(start) = start_date {
+                query = query.filter(bookings::check_out_date.ge(start));
+            }
+            if let Some(end) = end_date {
+                query = query.filter(bookings::check_out_date.le(end));
+            }
+            query
+        };
+
+        // Calculate total revenue (SUM of price)
+        let total_revenue: Option<BigDecimal> = build_query()
+            .select(sum(bookings::price))
+            .first(&mut conn)
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        // Calculate booking count
+        let booking_count: i64 = build_query()
+            .select(count(bookings::id))
+            .first(&mut conn)
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        // Calculate average revenue
+        let average_revenue: Option<BigDecimal> = build_query()
+            .select(avg(bookings::price))
+            .first(&mut conn)
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        // Calculate occupancy rate
+        // Occupancy = (total days occupied) / (total days in period) * 100
+        let occupancy_rate = if let (Some(start), Some(end)) = (start_date, end_date) {
+            let total_days = (end - start).num_days() as f64 + 1.0;
+            if total_days > 0.0 {
+                // Get all checked_out bookings in the period
+                let bookings_in_period: Vec<Booking> = bookings::table
+                    .filter(bookings::room_id.eq(room_id))
+                    .filter(bookings::status.eq(BookingStatus::CheckedOut))
+                    .filter(bookings::check_out_date.ge(start))
+                    .filter(bookings::check_out_date.le(end))
+                    .load(&mut conn)
+                    .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+                let total_days_occupied: i64 = bookings_in_period
+                    .iter()
+                    .map(|b| {
+                        // Calculate days for this booking, clamped to date range
+                        let booking_start = b.check_in_date.max(start);
+                        let booking_end = b.check_out_date.min(end);
+                        (booking_end - booking_start).num_days().max(0)
+                    })
+                    .sum();
+
+                (total_days_occupied as f64 / total_days) * 100.0
+            } else {
+                0.0
+            }
+        } else {
+            // No date range - calculate based on all time
+            // For simplicity, use a fixed period or return 0
+            // In a real system, you might want to use room creation date to now
+            0.0
+        };
+
+        Ok(RoomFinancials {
+            room_id,
+            total_revenue: total_revenue.unwrap_or_else(|| BigDecimal::from(0)),
+            booking_count,
+            average_revenue,
+            occupancy_rate: occupancy_rate.min(100.0).max(0.0),
+        })
     }
 }
 

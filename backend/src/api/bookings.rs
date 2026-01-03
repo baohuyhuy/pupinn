@@ -20,6 +20,8 @@ pub struct CreateBookingDto {
     pub room_id: Uuid,
     pub check_in_date: NaiveDate,
     pub check_out_date: NaiveDate,
+    #[serde(default)]
+    pub price: Option<bigdecimal::BigDecimal>,
 }
 
 /// Update booking request DTO
@@ -58,6 +60,7 @@ pub async fn create_booking(
         payload.room_id,
         payload.check_in_date,
         payload.check_out_date,
+        payload.price,
     )?;
     Ok((StatusCode::CREATED, Json(booking)))
 }

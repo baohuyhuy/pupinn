@@ -5,6 +5,7 @@ mod errors;
 mod models;
 mod schema;
 mod services;
+mod utils;
 
 use std::net::SocketAddr;
 
