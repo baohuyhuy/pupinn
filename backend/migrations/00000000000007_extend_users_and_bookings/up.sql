@@ -6,7 +6,7 @@ ALTER TABLE users
 
 -- Add price to bookings table
 ALTER TABLE bookings
-  ADD COLUMN price DECIMAL(10, 2) NOT NULL DEFAULT 0.00;
+  ADD COLUMN price DECIMAL(12, 0) NOT NULL DEFAULT 0;
 
 -- Create guest_interaction_notes table
 CREATE TABLE guest_interaction_notes (
