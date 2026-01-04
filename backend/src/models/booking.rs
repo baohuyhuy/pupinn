@@ -19,6 +19,8 @@ pub enum BookingStatus {
     CheckedIn,
     CheckedOut,
     Cancelled,
+    NoShow,
+    Overstay,
 }
 
 /// Booking model representing a guest reservation
@@ -84,8 +86,15 @@ impl BookingStatus {
             // Upcoming can go to checked_in or cancelled
             (BookingStatus::Upcoming, BookingStatus::CheckedIn) => true,
             (BookingStatus::Upcoming, BookingStatus::Cancelled) => true,
-            // CheckedIn can only go to checked_out
+            (BookingStatus::Upcoming, BookingStatus::NoShow) => true, // Automatic via handle_stale_bookings
+            // CheckedIn can go to checked_out
             (BookingStatus::CheckedIn, BookingStatus::CheckedOut) => true,
+            (BookingStatus::CheckedIn, BookingStatus::Overstay) => true, // Automatic via handle_stale_bookings
+            // NoShow can be checked in (late check-in) or cancelled
+            (BookingStatus::NoShow, BookingStatus::CheckedIn) => true,
+            (BookingStatus::NoShow, BookingStatus::Cancelled) => true,
+            // Overstay can be checked out
+            (BookingStatus::Overstay, BookingStatus::CheckedOut) => true,
             // CheckedOut and Cancelled are terminal states
             (BookingStatus::CheckedOut, _) => false,
             (BookingStatus::Cancelled, _) => false,
@@ -99,5 +108,23 @@ impl BookingStatus {
     /// Check if this is a terminal state
     pub fn is_terminal(&self) -> bool {
         matches!(self, BookingStatus::CheckedOut | BookingStatus::Cancelled)
+    }
+
+    /// Check if this status represents an active booking (room is occupied or should be)
+    pub fn is_active(&self) -> bool {
+        matches!(
+            self,
+            BookingStatus::CheckedIn | BookingStatus::Overstay
+        )
+    }
+
+    /// Check if this status blocks room availability
+    pub fn blocks_availability(&self) -> bool {
+        matches!(
+            self,
+            BookingStatus::Upcoming
+                | BookingStatus::CheckedIn
+                | BookingStatus::Overstay
+        )
     }
 }

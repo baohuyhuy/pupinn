@@ -41,10 +41,11 @@ impl RoomService {
         }
 
         // Set default price based on room type
+        // Default prices in VND (no fractional VND amounts)
         let price = match room_type {
-            RoomType::Single => BigDecimal::from_str("100.00").unwrap(),
-            RoomType::Double => BigDecimal::from_str("150.00").unwrap(),
-            RoomType::Suite => BigDecimal::from_str("250.00").unwrap(),
+            RoomType::Single => BigDecimal::from_str("1000000").unwrap(),
+            RoomType::Double => BigDecimal::from_str("1500000").unwrap(),
+            RoomType::Suite => BigDecimal::from_str("2500000").unwrap(),
         };
 
         let new_room = NewRoom { number, room_type, price };

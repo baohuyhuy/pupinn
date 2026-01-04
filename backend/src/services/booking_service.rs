@@ -1,11 +1,45 @@
-use chrono::{NaiveDate, Utc};
+use chrono::{NaiveDate, Utc, Duration};
 use diesel::prelude::*;
 use diesel::dsl::{count, sum, avg};
+use diesel::result::{QueryResult, DatabaseErrorInformation};
 use rand::Rng;
 use bigdecimal::BigDecimal;
 use std::str::FromStr;
 use serde::Serialize;
 use uuid::Uuid;
+
+/// Simple error wrapper for database errors
+struct StringError(String);
+
+impl DatabaseErrorInformation for StringError {
+    fn message(&self) -> &str {
+        &self.0
+    }
+
+    fn details(&self) -> Option<&str> {
+        None
+    }
+
+    fn hint(&self) -> Option<&str> {
+        None
+    }
+
+    fn table_name(&self) -> Option<&str> {
+        None
+    }
+
+    fn column_name(&self) -> Option<&str> {
+        None
+    }
+
+    fn constraint_name(&self) -> Option<&str> {
+        None
+    }
+
+    fn statement_position(&self) -> Option<i32> {
+        None
+    }
+}
 
 use crate::db::DbPool;
 use crate::errors::{AppError, AppResult};
@@ -13,7 +47,6 @@ use crate::models::{
     Booking, BookingStatus, BookingWithRoom, NewBooking, Room, RoomStatus, RoomType, UpdateBooking,
 };
 use crate::schema::{bookings, rooms};
-use crate::services::RoomService;
 
 /// Booking service for managing reservations
 pub struct BookingService {
@@ -37,12 +70,12 @@ impl BookingService {
     }
 
     /// Get default price for a room type
-    /// Returns the standard nightly rate for each room type
     fn get_default_price_for_room_type(room_type: RoomType) -> BigDecimal {
         match room_type {
-            RoomType::Single => BigDecimal::from_str("100.00").unwrap(),
-            RoomType::Double => BigDecimal::from_str("150.00").unwrap(),
-            RoomType::Suite => BigDecimal::from_str("250.00").unwrap(),
+            // Default prices in VND
+            RoomType::Single => BigDecimal::from_str("1000000").unwrap(),
+            RoomType::Double => BigDecimal::from_str("1500000").unwrap(),
+            RoomType::Suite => BigDecimal::from_str("2500000").unwrap(),
         }
     }
 
@@ -126,16 +159,16 @@ impl BookingService {
             .get()
             .map_err(|e| AppError::DatabaseError(e.to_string()))?;
 
-        // Find overlapping bookings that are not cancelled or checked out
+        // Find overlapping bookings that block availability
         let mut query = bookings::table
             .filter(bookings::room_id.eq(room_id))
             .filter(bookings::status.ne(BookingStatus::Cancelled))
             .filter(bookings::status.ne(BookingStatus::CheckedOut))
+            .filter(bookings::status.ne(BookingStatus::NoShow))
             .filter(bookings::check_in_date.lt(check_out_date))
             .filter(bookings::check_out_date.gt(check_in_date))
             .into_boxed();
 
-        // Exclude a specific booking (for updates)
         if let Some(booking_id) = exclude_booking_id {
             query = query.filter(bookings::id.ne(booking_id));
         }
@@ -143,6 +176,18 @@ impl BookingService {
         let conflicting: Vec<Booking> = query
             .load(&mut conn)
             .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        // Also treat room housekeeping status as blocking availability.
+        // If the room is not `Available` (e.g., Dirty/Cleaning/Maintenance),
+        // it's not bookable until staff marks it Available.
+        let room_rec: Room = rooms::table
+            .find(room_id)
+            .first(&mut conn)
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        if room_rec.status != RoomStatus::Available {
+            return Ok(false);
+        }
 
         Ok(conflicting.is_empty())
     }
@@ -156,10 +201,8 @@ impl BookingService {
         check_out_date: NaiveDate,
         price: Option<BigDecimal>,
     ) -> AppResult<Booking> {
-        // Validate dates
         self.validate_dates(check_in_date, check_out_date)?;
 
-        // Check room exists and get its info
         let mut conn = self
             .pool
             .get()
@@ -170,15 +213,15 @@ impl BookingService {
             .first(&mut conn)
             .map_err(|_| AppError::NotFound(format!("Room with ID '{}' not found", room_id)))?;
 
-        // Check room is not under maintenance
-        if room.status == RoomStatus::Maintenance {
+        // If the room is not Available (e.g., Dirty, Cleaning, Maintenance, Occupied),
+        // treat it as unavailable for new bookings until staff marks it Available again.
+        if room.status != RoomStatus::Available {
             return Err(AppError::RoomUnavailable(format!(
-                "Room {} is under maintenance",
+                "Room {} is not available for booking",
                 room.number
             )));
         }
 
-        // Check availability
         if !self.check_availability(room_id, check_in_date, check_out_date, None)? {
             return Err(AppError::RoomUnavailable(format!(
                 "Room {} is not available for the selected dates",
@@ -186,10 +229,8 @@ impl BookingService {
             )));
         }
 
-        // Generate reference
         let reference = self.generate_reference()?;
 
-        // Validate guest name
         if guest_name.trim().is_empty() {
             return Err(AppError::ValidationError(
                 "Guest name is required".to_string(),
@@ -202,13 +243,11 @@ impl BookingService {
             ));
         }
 
-        // Calculate price: use provided price, or calculate from room.price
         let booking_price = price.unwrap_or_else(|| {
             let nights = (check_out_date - check_in_date).num_days();
             &room.price * BigDecimal::from(nights.max(1))
         });
 
-        // println!("Room price: {}", room.price);
         let new_booking = NewBooking {
             reference: &reference,
             guest_name: guest_name.trim(),
@@ -311,14 +350,12 @@ impl BookingService {
             .load(&mut conn)
             .map_err(|e| AppError::DatabaseError(e.to_string()))?;
 
-        // Load rooms for all bookings
         let room_ids: Vec<Uuid> = booking_list.iter().map(|b| b.room_id).collect();
         let rooms_list: Vec<Room> = rooms::table
             .filter(rooms::id.eq_any(&room_ids))
             .load(&mut conn)
             .map_err(|e| AppError::DatabaseError(e.to_string()))?;
 
-        // Map rooms to bookings
         let result: Vec<BookingWithRoom> = booking_list
             .into_iter()
             .map(|booking| {
@@ -330,154 +367,45 @@ impl BookingService {
         Ok(result)
     }
 
-    /// Check in a guest
-    pub fn check_in(&self, booking_id: Uuid, confirm_early: bool) -> AppResult<Booking> {
+    pub fn get_guest_bookings(
+        &self,
+        guest_name_input: &str,
+        status_filter: Option<BookingStatus>,
+    ) -> AppResult<Vec<BookingWithRoom>> {
         let mut conn = self
             .pool
             .get()
             .map_err(|e| AppError::DatabaseError(e.to_string()))?;
 
-        let booking: Booking =
-            bookings::table
-                .find(booking_id)
-                .first(&mut conn)
-                .map_err(|_| {
-                    AppError::NotFound(format!("Booking with ID '{}' not found", booking_id))
-                })?;
+        use crate::schema::bookings::dsl as b;
+        use crate::schema::rooms::dsl as r;
 
-        // Validate status transition
-        if !booking.status.can_transition_to(BookingStatus::CheckedIn) {
-            return Err(AppError::InvalidStatusTransition(format!(
-                "Cannot check in booking with status {:?}",
-                booking.status
-            )));
+        let mut query = b::bookings
+            .inner_join(r::rooms)
+            .into_boxed();
+
+        query = query.filter(b::guest_name.eq(guest_name_input));
+
+        if let Some(s) = status_filter {
+            query = query.filter(b::status.eq(s));
         }
 
-        // Check if it's early check-in
-        let today = Utc::now().date_naive();
-        if booking.check_in_date > today && !confirm_early {
-            return Err(AppError::ValidationError(format!(
-                "Check-in date is {}. Confirm early check-in to proceed.",
-                booking.check_in_date
-            )));
-        }
-
-        // Update booking status
-        let update = UpdateBooking {
-            status: Some(BookingStatus::CheckedIn),
-            ..Default::default()
-        };
-
-        let updated_booking: Booking = diesel::update(bookings::table.find(booking_id))
-            .set(&update)
-            .get_result(&mut conn)
+        let results: Vec<(Booking, Room)> = query
+            .order(b::created_at.desc())
+            .load::<(Booking, Room)>(&mut conn)
             .map_err(|e| AppError::DatabaseError(e.to_string()))?;
 
-        // Update room status to occupied
-        // First check current room status - if dirty, set to available first
-        let room_service = RoomService::new(self.pool.clone());
-        let current_room = room_service.get_room_by_id(booking.room_id)?;
-        
-        // If room is dirty, we need to set it to available first (dirty -> available -> occupied)
-        // This handles the case where a room was checked out but not yet cleaned
-        if current_room.status == RoomStatus::Dirty {
-            room_service.update_room_status(booking.room_id, RoomStatus::Available)?;
-        }
-        
-        // Now set to occupied (available -> occupied is allowed)
-        room_service.update_room_status(booking.room_id, RoomStatus::Occupied)?;
+        let response = results.into_iter().map(|(booking, room)| {
+            BookingWithRoom {
+                booking,
+                room: Some(room)
+            }
+        }).collect();
 
-        Ok(updated_booking)
-    }
-
-    /// Check out a guest
-    pub fn check_out(&self, booking_id: Uuid) -> AppResult<Booking> {
-        let mut conn = self
-            .pool
-            .get()
-            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
-
-        let booking: Booking =
-            bookings::table
-                .find(booking_id)
-                .first(&mut conn)
-                .map_err(|_| {
-                    AppError::NotFound(format!("Booking with ID '{}' not found", booking_id))
-                })?;
-
-        // Validate status transition
-        if !booking.status.can_transition_to(BookingStatus::CheckedOut) {
-            return Err(AppError::InvalidStatusTransition(format!(
-                "Cannot check out booking with status {:?}. Guest must be checked in first.",
-                booking.status
-            )));
-        }
-
-        // Update booking status
-        let update = UpdateBooking {
-            status: Some(BookingStatus::CheckedOut),
-            ..Default::default()
-        };
-
-        let updated_booking: Booking = diesel::update(bookings::table.find(booking_id))
-            .set(&update)
-            .get_result(&mut conn)
-            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
-
-        // Update room status to dirty so cleaners can pick it up immediately
-        let room_service = RoomService::new(self.pool.clone());
-        room_service.update_room_status(booking.room_id, RoomStatus::Dirty)?;
-
-        Ok(updated_booking)
-    }
-
-    /// Cancel a booking
-    pub fn cancel(&self, booking_id: Uuid) -> AppResult<Booking> {
-        let mut conn = self
-            .pool
-            .get()
-            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
-
-        let booking: Booking =
-            bookings::table
-                .find(booking_id)
-                .first(&mut conn)
-                .map_err(|_| {
-                    AppError::NotFound(format!("Booking with ID '{}' not found", booking_id))
-                })?;
-
-        // Validate status transition
-        if !booking.status.can_transition_to(BookingStatus::Cancelled) {
-            return Err(AppError::InvalidStatusTransition(format!(
-                "Cannot cancel booking with status {:?}. Only upcoming bookings can be cancelled.",
-                booking.status
-            )));
-        }
-
-        // Update booking status
-        let update = UpdateBooking {
-            status: Some(BookingStatus::Cancelled),
-            ..Default::default()
-        };
-
-        diesel::update(bookings::table.find(booking_id))
-            .set(&update)
-            .get_result(&mut conn)
-            .map_err(|e| AppError::DatabaseError(e.to_string()))
+        Ok(response)
     }
 
     /// Create a new booking for a guest user
-    ///
-    /// This method is used when a guest creates a booking through the guest portal.
-    /// The guest's user_id is recorded, and the guest's name is used from their account.
-    ///
-    /// # Arguments
-    /// * `user_id` - The UUID of the guest user creating the booking
-    /// * `guest_name` - The name to use for the booking (typically the guest's full name)
-    /// * `room_id` - The room to book
-    /// * `check_in_date` - Check-in date
-    /// * `check_out_date` - Check-out date
-    /// * `price` - Optional booking price
     pub fn create_guest_booking(
         &self,
         user_id: Uuid,
@@ -487,10 +415,8 @@ impl BookingService {
         check_out_date: NaiveDate,
         price: Option<BigDecimal>,
     ) -> AppResult<BookingWithRoom> {
-        // Validate dates
         self.validate_dates(check_in_date, check_out_date)?;
 
-        // Check room exists and get its info
         let mut conn = self
             .pool
             .get()
@@ -501,7 +427,6 @@ impl BookingService {
             .first(&mut conn)
             .map_err(|_| AppError::NotFound(format!("Room with ID '{}' not found", room_id)))?;
 
-        // Check room is not under maintenance
         if room.status == RoomStatus::Maintenance {
             return Err(AppError::RoomUnavailable(format!(
                 "Room {} is under maintenance",
@@ -509,7 +434,6 @@ impl BookingService {
             )));
         }
 
-        // Check availability
         if !self.check_availability(room_id, check_in_date, check_out_date, None)? {
             return Err(AppError::RoomUnavailable(format!(
                 "Room {} is not available for the selected dates",
@@ -517,23 +441,14 @@ impl BookingService {
             )));
         }
 
-        // Generate reference
         let reference = self.generate_reference()?;
 
-        // Validate guest name
         if guest_name.trim().is_empty() {
             return Err(AppError::ValidationError(
                 "Guest name is required".to_string(),
             ));
         }
 
-        if guest_name.len() > 100 {
-            return Err(AppError::ValidationError(
-                "Guest name must be 100 characters or less".to_string(),
-            ));
-        }
-
-        // Calculate price: use provided price, or calculate from room.price
         let booking_price = price.unwrap_or_else(|| {
             let nights = (check_out_date - check_in_date).num_days();
             &room.price * BigDecimal::from(nights.max(1))
@@ -561,13 +476,7 @@ impl BookingService {
         })
     }
 
-    /// List bookings for a specific user (guest)
-    ///
-    /// Returns all bookings created by the specified user, ordered by check-in date.
-    ///
-    /// # Arguments
-    /// * `user_id` - The UUID of the user whose bookings to list
-    /// * `status_filter` - Optional status filter
+    /// List bookings by user ID
     pub fn list_bookings_by_user(
         &self,
         user_id: Uuid,
@@ -591,14 +500,12 @@ impl BookingService {
             .load(&mut conn)
             .map_err(|e| AppError::DatabaseError(e.to_string()))?;
 
-        // Load rooms for all bookings
         let room_ids: Vec<Uuid> = booking_list.iter().map(|b| b.room_id).collect();
         let rooms_list: Vec<Room> = rooms::table
             .filter(rooms::id.eq_any(&room_ids))
             .load(&mut conn)
             .map_err(|e| AppError::DatabaseError(e.to_string()))?;
 
-        // Map rooms to bookings
         let result: Vec<BookingWithRoom> = booking_list
             .into_iter()
             .map(|booking| {
@@ -610,13 +517,7 @@ impl BookingService {
         Ok(result)
     }
 
-    /// Get a booking by ID with ownership check
-    ///
-    /// Returns the booking only if it belongs to the specified user.
-    ///
-    /// # Arguments
-    /// * `booking_id` - The booking ID
-    /// * `user_id` - The user ID to verify ownership
+    /// Get a booking for a specific user (ownership check)
     pub fn get_guest_booking(
         &self,
         booking_id: Uuid,
@@ -624,7 +525,6 @@ impl BookingService {
     ) -> AppResult<BookingWithRoom> {
         let booking_with_room = self.get_booking_with_room(booking_id)?;
 
-        // Verify ownership
         if booking_with_room.booking.created_by_user_id != Some(user_id) {
             return Err(AppError::NotFound("Booking not found".to_string()));
         }
@@ -632,13 +532,7 @@ impl BookingService {
         Ok(booking_with_room)
     }
 
-    /// Cancel a guest booking with ownership check
-    ///
-    /// Cancels the booking only if it belongs to the specified user and is in "upcoming" status.
-    ///
-    /// # Arguments
-    /// * `booking_id` - The booking ID
-    /// * `user_id` - The user ID to verify ownership
+    /// Cancel a booking for a specific user
     pub fn cancel_guest_booking(
         &self,
         booking_id: Uuid,
@@ -649,25 +543,211 @@ impl BookingService {
             .get()
             .map_err(|e| AppError::DatabaseError(e.to_string()))?;
 
-        let booking: Booking =
-            bookings::table
-                .find(booking_id)
-                .first(&mut conn)
-                .map_err(|_| AppError::NotFound("Booking not found".to_string()))?;
+        let booking: Booking = bookings::table
+            .find(booking_id)
+            .first(&mut conn)
+            .map_err(|_| AppError::NotFound("Booking not found".to_string()))?;
 
-        // Verify ownership
         if booking.created_by_user_id != Some(user_id) {
             return Err(AppError::NotFound("Booking not found".to_string()));
         }
 
-        // Validate status - only upcoming bookings can be cancelled
         if booking.status != BookingStatus::Upcoming {
             return Err(AppError::InvalidStatusTransition(
                 "Only upcoming bookings can be cancelled".to_string(),
             ));
         }
 
-        // Update booking status
+        let update = UpdateBooking {
+            status: Some(BookingStatus::Cancelled),
+            ..Default::default()
+        };
+
+        diesel::update(bookings::table.find(booking_id))
+            .set(&update)
+            .get_result(&mut conn)
+            .map_err(|e| AppError::DatabaseError(e.to_string()))
+    }
+
+    /// Check in a guest
+    pub fn check_in(&self, booking_id: Uuid, confirm_early: bool) -> AppResult<Booking> {
+        let mut conn = self
+            .pool
+            .get()
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        fn app_error_to_diesel(e: AppError) -> diesel::result::Error {
+            diesel::result::Error::DatabaseError(
+                diesel::result::DatabaseErrorKind::CheckViolation,
+                Box::new(StringError(e.to_string())) as Box<dyn DatabaseErrorInformation + Send + Sync>,
+            )
+        }
+
+        conn.transaction::<_, diesel::result::Error, _>(|conn| {
+            let booking: Booking = bookings::table
+                .find(booking_id)
+                .first(conn)
+                .map_err(|_| diesel::result::Error::NotFound)?;
+
+            if !booking.status.can_transition_to(BookingStatus::CheckedIn) {
+                return Err(app_error_to_diesel(AppError::InvalidStatusTransition(format!(
+                    "Cannot check in booking with status {:?}",
+                    booking.status
+                ))));
+            }
+
+            let today = Utc::now().date_naive();
+            if booking.check_in_date > today && !confirm_early {
+                return Err(app_error_to_diesel(AppError::ValidationError(format!(
+                    "Check-in date is {}. Confirm early check-in to proceed.",
+                    booking.check_in_date
+                ))));
+            }
+
+            let current_room: Room = rooms::table
+                .find(booking.room_id)
+                .first(conn)
+                .map_err(|_| diesel::result::Error::NotFound)?;
+
+            if current_room.status == RoomStatus::Maintenance {
+                return Err(app_error_to_diesel(AppError::RoomUnavailable(
+                    "Room is under maintenance".to_string(),
+                )));
+            }
+
+            let rows_updated = diesel::update(
+                bookings::table
+                    .find(booking_id)
+                    .filter(bookings::status.eq(booking.status)),
+            )
+            .set(bookings::status.eq(BookingStatus::CheckedIn))
+            .execute(conn)?;
+
+            if rows_updated == 0 {
+                return Err(app_error_to_diesel(AppError::Conflict(
+                    "Booking status was updated by another operation.".to_string(),
+                )));
+            }
+
+            if current_room.status == RoomStatus::Dirty {
+                diesel::update(rooms::table.find(booking.room_id))
+                    .set(rooms::status.eq(RoomStatus::Available))
+                    .execute(conn)?;
+            }
+
+            diesel::update(rooms::table.find(booking.room_id))
+                .set(rooms::status.eq(RoomStatus::Occupied))
+                .execute(conn)?;
+
+            bookings::table
+                .find(booking_id)
+                .first(conn)
+                .map_err(|_| diesel::result::Error::NotFound)
+        })
+        .map_err(|e| AppError::from(e))
+    }
+
+    /// Check out a guest
+    pub fn check_out(&self, booking_id: Uuid, _confirm_early: bool) -> AppResult<Booking> {
+        let mut conn = self
+            .pool
+            .get()
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        fn app_error_to_diesel(e: AppError) -> diesel::result::Error {
+            diesel::result::Error::DatabaseError(
+                diesel::result::DatabaseErrorKind::CheckViolation,
+                Box::new(StringError(e.to_string())) as Box<dyn DatabaseErrorInformation + Send + Sync>,
+            )
+        }
+
+        conn.transaction::<_, diesel::result::Error, _>(|conn| {
+            let booking: Booking = bookings::table
+                .find(booking_id)
+                .first(conn)
+                .map_err(|_| diesel::result::Error::NotFound)?;
+
+            if !booking.status.can_transition_to(BookingStatus::CheckedOut) {
+                return Err(app_error_to_diesel(AppError::InvalidStatusTransition(format!(
+                    "Cannot check out booking with status {:?}.",
+                    booking.status
+                ))));
+            }
+
+            // Allow staff to perform an early check-out without requiring an explicit
+            // confirmation flag. Previously we prevented check-outs when the
+            // booking's check-out date was in the future unless `confirm_early`
+            // was true — this blocked legitimate early check-outs initiated by
+            // staff or guests. For now, permit early check-outs unconditionally.
+            let _today = Utc::now().date_naive();
+
+            let current_room: Room = rooms::table
+                .find(booking.room_id)
+                .first(conn)
+                .map_err(|_| diesel::result::Error::NotFound)?;
+
+            if current_room.status != RoomStatus::Occupied {
+                return Err(app_error_to_diesel(AppError::ValidationError(format!(
+                    "Room {} is not currently occupied.",
+                    current_room.number
+                ))));
+            }
+
+            // Update the booking's check_out_date to today (or at least
+            // `check_in_date + 1`) and adjust the price so financial reports
+            // reflect the actual stay. Database enforces `check_out_date >
+            // check_in_date`, so ensure we respect that constraint.
+            let today = Utc::now().date_naive();
+            let min_checkout = booking.check_in_date + Duration::days(1);
+            let desired_checkout = if today > min_checkout { today } else { min_checkout };
+
+            let nights_i64 = (desired_checkout - booking.check_in_date).num_days().max(1);
+            let nights = BigDecimal::from(nights_i64);
+            let new_price = current_room.price.clone() * nights;
+
+            // Perform the update and return the updated booking row. Using
+            // `get_result` surfaces database errors with better context.
+            let updated_booking: Booking = diesel::update(
+                bookings::table
+                    .find(booking_id)
+                    .filter(bookings::status.eq(booking.status)),
+            )
+            .set((
+                bookings::status.eq(BookingStatus::CheckedOut),
+                bookings::check_out_date.eq(desired_checkout),
+                bookings::price.eq(new_price.clone()),
+            ))
+            .get_result(conn)?;
+
+            // Mark the room as dirty after successful check-out
+            diesel::update(rooms::table.find(booking.room_id))
+                .set(rooms::status.eq(RoomStatus::Dirty))
+                .execute(conn)?;
+
+            Ok(updated_booking)
+        })
+        .map_err(|e| AppError::from(e))
+    }
+
+    /// Cancel a booking
+    pub fn cancel(&self, booking_id: Uuid) -> AppResult<Booking> {
+        let mut conn = self
+            .pool
+            .get()
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        let booking: Booking = bookings::table
+            .find(booking_id)
+            .first(&mut conn)
+            .map_err(|_| AppError::NotFound(format!("Booking '{}' not found", booking_id)))?;
+
+        if !booking.status.can_transition_to(BookingStatus::Cancelled) {
+            return Err(AppError::InvalidStatusTransition(format!(
+                "Cannot cancel booking with status {:?}.",
+                booking.status
+            )));
+        }
+
         let update = UpdateBooking {
             status: Some(BookingStatus::Cancelled),
             ..Default::default()
@@ -680,14 +760,6 @@ impl BookingService {
     }
 
     /// Calculate financial metrics for a room
-    ///
-    /// # Arguments
-    /// * `room_id` - The room ID
-    /// * `start_date` - Optional start date filter (inclusive)
-    /// * `end_date` - Optional end date filter (inclusive, based on check_out_date)
-    ///
-    /// # Returns
-    /// * `RoomFinancials` with revenue, booking count, average revenue, and occupancy rate
     pub fn calculate_room_financials(
         &self,
         room_id: Uuid,
@@ -699,59 +771,60 @@ impl BookingService {
             .get()
             .map_err(|e| AppError::DatabaseError(e.to_string()))?;
 
-        // Helper function to build the base query
         let build_query = || {
             let mut query = bookings::table
                 .into_boxed()
                 .filter(bookings::room_id.eq(room_id))
                 .filter(bookings::status.eq(BookingStatus::CheckedOut));
 
-            // Apply date range filter (based on check_out_date)
-            if let Some(start) = start_date {
+            // If both start and end are provided, select bookings that overlap
+            // the date interval [start, end] (i.e. check_in_date <= end AND
+            // check_out_date >= start). If only one bound is provided, fall
+            // back to filtering by check_out_date as before.
+            if let (Some(start), Some(end)) = (start_date, end_date) {
+                query = query.filter(bookings::check_in_date.le(end));
                 query = query.filter(bookings::check_out_date.ge(start));
+            } else {
+                if let Some(start) = start_date {
+                    query = query.filter(bookings::check_out_date.ge(start));
+                }
+                if let Some(end) = end_date {
+                    query = query.filter(bookings::check_out_date.le(end));
+                }
             }
-            if let Some(end) = end_date {
-                query = query.filter(bookings::check_out_date.le(end));
-            }
+
             query
         };
 
-        // Calculate total revenue (SUM of price)
         let total_revenue: Option<BigDecimal> = build_query()
             .select(sum(bookings::price))
             .first(&mut conn)
             .map_err(|e| AppError::DatabaseError(e.to_string()))?;
 
-        // Calculate booking count
         let booking_count: i64 = build_query()
             .select(count(bookings::id))
             .first(&mut conn)
             .map_err(|e| AppError::DatabaseError(e.to_string()))?;
 
-        // Calculate average revenue
         let average_revenue: Option<BigDecimal> = build_query()
             .select(avg(bookings::price))
             .first(&mut conn)
             .map_err(|e| AppError::DatabaseError(e.to_string()))?;
 
-        // Calculate occupancy rate
-        // Occupancy = (total days occupied) / (total days in period) * 100
         let occupancy_rate = if let (Some(start), Some(end)) = (start_date, end_date) {
             let total_days = (end - start).num_days() as f64 + 1.0;
             if total_days > 0.0 {
-                // Get all checked_out bookings in the period
                 let bookings_in_period: Vec<Booking> = bookings::table
                     .filter(bookings::room_id.eq(room_id))
                     .filter(bookings::status.eq(BookingStatus::CheckedOut))
+                    .filter(bookings::check_in_date.le(end))
                     .filter(bookings::check_out_date.ge(start))
-                    .filter(bookings::check_out_date.le(end))
                     .load(&mut conn)
                     .map_err(|e| AppError::DatabaseError(e.to_string()))?;
 
                 let total_days_occupied: i64 = bookings_in_period
                     .iter()
                     .map(|b| {
-                        // Calculate days for this booking, clamped to date range
                         let booking_start = b.check_in_date.max(start);
                         let booking_end = b.check_out_date.min(end);
                         (booking_end - booking_start).num_days().max(0)
@@ -763,9 +836,6 @@ impl BookingService {
                 0.0
             }
         } else {
-            // No date range - calculate based on all time
-            // For simplicity, use a fixed period or return 0
-            // In a real system, you might want to use room creation date to now
             0.0
         };
 
@@ -777,5 +847,24 @@ impl BookingService {
             occupancy_rate: occupancy_rate.min(100.0).max(0.0),
         })
     }
-}
 
+    /// Handle stale bookings
+    pub fn handle_stale_bookings(&self, conn: &mut PgConnection) -> QueryResult<(usize, usize)> {
+        use crate::schema::bookings::dsl::*;
+        let today = chrono::Utc::now().naive_utc().date();
+
+        let no_show_count = diesel::update(bookings)
+            .filter(status.eq(BookingStatus::Upcoming))
+            .filter(check_in_date.lt(today))
+            .set(status.eq(BookingStatus::NoShow))
+            .execute(conn)?;
+
+        let overstay_count = diesel::update(bookings)
+            .filter(status.eq(BookingStatus::CheckedIn))
+            .filter(check_out_date.lt(today))
+            .set(status.eq(BookingStatus::Overstay))
+            .execute(conn)?;
+
+        Ok((no_show_count, overstay_count))
+    }
+}

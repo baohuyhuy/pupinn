@@ -10,7 +10,7 @@ use uuid::Uuid;
 use crate::api::{middleware::AuthUser, AppState};
 use crate::errors::AppError;
 use crate::models::{BookingWithRoom, GuestNote, UpdateUser, User};
-use crate::services::{GuestService};
+use crate::services::GuestService;
 use crate::utils::{validate_email, validate_phone, validate_search_query};
 
 /// Guest search query parameters
@@ -50,6 +50,7 @@ impl From<User> for GuestResponse {
 }
 
 /// Guest profile response with booking history
+/// This includes the full BookingWithRoom struct (so the frontend sees the Price)
 #[derive(Debug, Serialize)]
 pub struct GuestProfileResponse {
     pub guest: GuestResponse,
@@ -95,6 +96,8 @@ pub struct AddGuestNoteRequest {
     pub note: String,
 }
 
+// ---------------- HANDLERS ----------------
+
 /// Search for guests
 /// GET /admin/guests/search?q=query
 pub async fn search_guests(
@@ -126,7 +129,11 @@ pub async fn get_guest_profile(
     Extension(_auth_user): Extension<AuthUser>,
 ) -> Result<impl IntoResponse, AppError> {
     let guest_service = GuestService::new(state.pool.clone());
+    
+    // Fetch guest details
     let guest = guest_service.get_guest_profile(guest_id)?;
+    
+    // Fetch booking history (Calls BookingService internally to get Rooms + Prices)
     let booking_history = guest_service.get_guest_booking_history(guest_id)?;
 
     Ok(Json(GuestProfileResponse {
@@ -160,8 +167,8 @@ pub async fn update_guest(
     let guest_service = GuestService::new(state.pool.clone());
 
     let update = UpdateUser {
-        username: None,
-        role: None,
+        username: None, 
+        role: None,     
         email: request.email,
         full_name: request.full_name,
         phone: request.phone,
@@ -201,9 +208,9 @@ pub async fn add_guest_note(
     Json(request): Json<AddGuestNoteRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     let guest_service = GuestService::new(state.pool.clone());
+    
+    // Record the note using the admin's ID
     let note = guest_service.add_guest_note(guest_id, auth_user.user_id, &request.note)?;
 
     Ok((StatusCode::CREATED, Json(GuestNoteResponse::from(note))))
 }
-
-    
