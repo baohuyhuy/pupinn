@@ -1,5 +1,6 @@
 // bin/seed.rs
 use diesel::prelude::*;
+use diesel::associations::HasTable;
 use dotenvy::dotenv;
 use bigdecimal::BigDecimal;
 use std::str::FromStr;
@@ -212,7 +213,7 @@ fn seed_bookings(conn: &mut PgConnection) {
     // Helper to find guest user ID by email
     let get_guest_id = |guest_email: &str, conn: &mut PgConnection| -> Option<uuid::Uuid> {
         use hotel_management_backend::schema::users::dsl::*;
-        users::table
+        users
             .filter(email.eq(guest_email))
             .filter(role.eq(UserRole::Guest))
             .select(id)
