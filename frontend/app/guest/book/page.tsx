@@ -124,32 +124,17 @@ export default function GuestBookPage() {
     }
   };
 
+
   const handleCloseConfirmation = () => {
     setShowConfirmation(false);
     router.push("/guest/bookings");
   };
 
+  // TODO: Replace with your actual page JSX
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-"use client";
-
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-
-export default function GuestBookRedirectPage() {
-  const router = useRouter();
-
-  useEffect(() => {
-    // Redirect to new bookings page
-    router.replace("/guest/bookings/new");
-  }, [router]);
-
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-slate-900 via-slate-800 to-slate-900">
-      <div className="text-slate-400">Redirecting...</div>
+    <div>
+      {/* Page content goes here */}
+      <h1>Guest Book Page</h1>
     </div>
   );
 }
-

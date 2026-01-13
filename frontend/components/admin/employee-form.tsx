@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
+import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,9 +27,18 @@ import {
   type Employee,
   type CreateEmployeeRequest,
   type UpdateEmployeeRequest,
-  CreateEmployeeRequestSchema,
-  UpdateEmployeeRequestSchema,
 } from "@/lib/validators";
+
+// Combined form schema that works for both create and edit
+const EmployeeFormSchema = z.object({
+  username: z.string().min(3, "Username must be at least 3 characters").max(50),
+  password: z.string().optional(),
+  role: z.enum(["admin", "receptionist", "cleaner"]),
+  email: z.string().email("Invalid email format").optional().nullable().or(z.literal("")),
+  full_name: z.string().max(100, "Full name must be 100 characters or less").optional().nullable().or(z.literal("")),
+});
+
+type EmployeeFormData = z.infer<typeof EmployeeFormSchema>;
 
 interface EmployeeFormProps {
   employee?: Employee;
@@ -52,35 +62,22 @@ export function EmployeeForm({
       const result = await listEmployees({ role: "admin", page: 1, per_page: 1 });
       return result.total > 0;
     },
-    staleTime: 30000, // Cache for 30 seconds
+    staleTime: 30000,
   });
 
   const adminExists = adminCheck ?? false;
 
-  const createForm = useForm<CreateEmployeeRequest>({
-    resolver: zodResolver(CreateEmployeeRequestSchema),
+  const form = useForm<EmployeeFormData>({
+    resolver: zodResolver(EmployeeFormSchema),
     defaultValues: {
-      username: "",
+      username: employee?.username || "",
       password: "",
-      role: "receptionist",
-      email: null,
-      full_name: null,
+      role: employee?.role === "guest" ? "receptionist" : (employee?.role || "receptionist"),
+      email: employee?.email || "",
+      full_name: employee?.full_name || "",
     },
   });
 
-  const updateForm = useForm<UpdateEmployeeRequest>({
-    resolver: zodResolver(UpdateEmployeeRequestSchema),
-    defaultValues: employee
-      ? {
-          username: employee.username || null,
-          role: employee.role,
-          email: employee.email || null,
-          full_name: employee.full_name || null,
-        }
-      : {},
-  });
-
-  const form = isEditMode ? updateForm : createForm;
   const {
     register,
     handleSubmit,
@@ -93,22 +90,26 @@ export function EmployeeForm({
 
   useEffect(() => {
     if (employee) {
-      setValue("username", employee.username || null);
-      setValue("role", employee.role);
-      setValue("email", employee.email || null);
-      setValue("full_name", employee.full_name || null);
+      setValue("username", employee.username || "");
+      setValue("role", employee.role === "guest" ? "receptionist" : employee.role);
+      setValue("email", employee.email || "");
+      setValue("full_name", employee.full_name || "");
     }
   }, [employee, setValue]);
 
-  const onSubmit = async (
-    data: CreateEmployeeRequest | UpdateEmployeeRequest
-  ) => {
+  const onSubmit = async (data: EmployeeFormData) => {
     setIsLoading(true);
     setError(null);
 
+    // Validate password for create mode
+    if (!isEditMode && (!data.password || data.password.length < 8)) {
+      setError("Password must be at least 8 characters");
+      setIsLoading(false);
+      return;
+    }
+
     // Additional client-side validation: prevent creating/updating to admin if one exists
-    const role = "role" in data ? data.role : (data as UpdateEmployeeRequest).role;
-    if (role === "admin" && adminExists) {
+    if (data.role === "admin" && adminExists) {
       const isChangingToAdmin = isEditMode && employee?.role !== "admin";
       if (isChangingToAdmin || !isEditMode) {
         setError(
@@ -121,14 +122,26 @@ export function EmployeeForm({
 
     try {
       if (isEditMode && employee) {
-        await updateEmployee(employee.id, data as UpdateEmployeeRequest);
+        const updateData: UpdateEmployeeRequest = {
+          username: data.username || null,
+          role: data.role,
+          email: data.email || null,
+          full_name: data.full_name || null,
+        };
+        await updateEmployee(employee.id, updateData);
       } else {
-        await createEmployee(data as CreateEmployeeRequest);
+        const createData: CreateEmployeeRequest = {
+          username: data.username,
+          password: data.password!,
+          role: data.role,
+          email: data.email || null,
+          full_name: data.full_name || null,
+        };
+        await createEmployee(createData);
       }
       onSuccess();
     } catch (err: unknown) {
       const errorMessage = getErrorMessage(err);
-      // Ensure constraint violation errors are clearly displayed
       if (
         errorMessage.includes("admin") ||
         errorMessage.includes("Only one admin")
@@ -201,9 +214,9 @@ export function EmployeeForm({
         </Label>
         <Select
           value={selectedRole}
-          onValueChange={(value) =>
-            setValue("role", value as "admin" | "receptionist" | "cleaner")
-          }
+          onValueChange={(value) => {
+            setValue("role", value as "admin" | "receptionist" | "cleaner");
+          }}
           disabled={isLoading}
         >
           <SelectTrigger className="bg-slate-700/50 border-slate-600 text-slate-100">
@@ -309,4 +322,3 @@ export function EmployeeForm({
     </form>
   );
 }
-
