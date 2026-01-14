@@ -14,6 +14,7 @@ import {
   DoorOpen,
   NotebookPen,
   ListChecks,
+  KeyRound,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -359,6 +360,21 @@ export default function ReceptionistDashboardPage() {
                 <CardTitle className="text-slate-100">View Rooms</CardTitle>
                 <CardDescription className="text-slate-400">
                   See current room status and availability
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          </Link>
+
+          {/* Action 4: Change Password */}
+          <Link href="/staff/change-password">
+            <Card className="bg-slate-800/80 border-slate-700 hover:border-slate-500/50 transition-colors cursor-pointer group">
+              <CardHeader>
+                <div className="w-12 h-12 bg-linear-to-br from-slate-400 to-slate-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                  <KeyRound className="h-6 w-6 text-white" />
+                </div>
+                <CardTitle className="text-slate-100">Change Password</CardTitle>
+                <CardDescription className="text-slate-400">
+                  Update your login password
                 </CardDescription>
               </CardHeader>
             </Card>

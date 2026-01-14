@@ -3,6 +3,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import Link from "next/link";
+import { KeyRound } from "lucide-react";
 
 import { useAuth } from "@/components/auth-provider";
 import { RouteGuard } from "@/components/route-guard";
@@ -10,6 +12,13 @@ import { CleanerDashboard } from "@/components/cleaner-dashboard";
 import { getCleanerRooms, updateRoomStatus, getErrorMessage } from "@/lib/api-client";
 import { type Room, type RoomStatus } from "@/lib/validators";
 import { UserRole } from "@/lib/validators";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
 export default function CleanerDashboardPage() {
   const router = useRouter();
@@ -92,6 +101,22 @@ export default function CleanerDashboardPage() {
             <p className="text-slate-400 mt-1">
               Overview of all rooms and their current status
             </p>
+          </div>
+
+          <div className="mb-6">
+            <Link href="/staff/change-password">
+              <Card className="bg-slate-800/80 border-slate-700 hover:border-slate-500/50 transition-colors cursor-pointer group max-w-md">
+                <CardHeader>
+                  <div className="w-12 h-12 bg-linear-to-br from-slate-400 to-slate-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                    <KeyRound className="h-6 w-6 text-white" />
+                  </div>
+                  <CardTitle className="text-slate-100">Change Password</CardTitle>
+                  <CardDescription className="text-slate-400">
+                    Update your login password
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+            </Link>
           </div>
 
           <CleanerDashboard

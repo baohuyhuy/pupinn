@@ -13,7 +13,8 @@ import {
   Shield,
   PawPrint,
   UserPlus,
-  Brush, // Added Brush icon for Cleaner
+  Brush, 
+  KeyRound,
 } from "lucide-react";
 
 import {
@@ -251,7 +252,18 @@ export function AppSidebar() {
         {isAuthenticated ? (
           <>
             {isCollapsed ? (
-              <div className="flex justify-center">
+              <div className="flex justify-center gap-2">
+                <Button
+                  asChild
+                  variant="ghost"
+                  size="icon"
+                  className="h-10 w-10 rounded-full border border-white/10 bg-white/10 text-white hover:bg-white/20 cursor-pointer"
+                  title="Change password"
+                >
+                  <Link href="/staff/change-password">
+                    <KeyRound className="h-4 w-4" />
+                  </Link>
+                </Button>
                 <Button
                   onClick={logout}
                   variant="ghost"
@@ -285,15 +297,28 @@ export function AppSidebar() {
                     </p>
                   </div>
                 </div>
-                <Button
-                  onClick={logout}
-                  variant="ghost"
-                  size="sm"
-                  className="mt-3 w-full justify-center gap-2 border border-white/10 bg-white/5 text-white hover:bg-white/10 cursor-pointer"
-                >
-                  <LogOut className="h-4 w-4" />
-                  <span>Sign out</span>
-                </Button>
+                <div className="space-y-2">
+                  <Button
+                    asChild
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-center gap-2 border border-white/10 bg-white/5 text-white hover:bg-white/10 cursor-pointer"
+                  >
+                    <Link href="/staff/change-password">
+                      <KeyRound className="h-4 w-4" />
+                      <span>Change Password</span>
+                    </Link>
+                  </Button>
+                  <Button
+                    onClick={logout}
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-center gap-2 border border-white/10 bg-white/5 text-white hover:bg-white/10 cursor-pointer"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    <span>Sign out</span>
+                  </Button>
+                </div>
               </div>
             )}
           </>
