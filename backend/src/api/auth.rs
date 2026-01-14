@@ -5,7 +5,7 @@ use crate::api::middleware::AuthUser;
 use crate::api::AppState;
 use crate::errors::AppError;
 use crate::models::{UserInfo, UserRole};
-use crate::services::auth_service::{CreateUserRequest, LoginRequest};
+use crate::services::auth_service::{ChangePasswordRequest, CreateUserRequest, LoginRequest};
 use crate::services::AuthService;
 
 /// Login request DTO
@@ -21,6 +21,13 @@ pub struct CreateUserDto {
     pub username: String,
     pub password: String,
     pub role: UserRole,
+}
+
+/// Change password DTO for staff users
+#[derive(Debug, Deserialize)]
+pub struct ChangePasswordDto {
+    pub current_password: String,
+    pub new_password: String,
 }
 
 /// Login handler
@@ -70,4 +77,22 @@ pub async fn create_user(
     let user_info = auth_service.create_user(&request)?;
 
     Ok((StatusCode::CREATED, Json(user_info)))
+}
+
+/// Change password handler for authenticated staff users
+pub async fn change_password(
+    State(state): State<AppState>,
+    Extension(auth_user): Extension<AuthUser>,
+    Json(payload): Json<ChangePasswordDto>,
+) -> Result<impl IntoResponse, AppError> {
+    let auth_service = AuthService::new(state.pool, state.jwt_secret);
+
+    let request = ChangePasswordRequest {
+        current_password: payload.current_password,
+        new_password: payload.new_password,
+    };
+
+    auth_service.change_employee_password(auth_user.user_id, &request)?;
+
+    Ok(StatusCode::NO_CONTENT)
 }

@@ -38,6 +38,13 @@ pub struct LoginResponse {
     pub user: UserInfo,
 }
 
+/// Change password request payload (for authenticated users)
+#[derive(Debug, Deserialize)]
+pub struct ChangePasswordRequest {
+    pub current_password: String,
+    pub new_password: String,
+}
+
 /// Create user request payload
 #[derive(Debug, Deserialize)]
 pub struct CreateUserRequest {
@@ -812,6 +819,120 @@ impl AuthService {
 
         // Update password
         diesel::update(users::table.find(employee_id))
+            .set(users::password_hash.eq(&hashed_password))
+            .execute(&mut conn)
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        Ok(())
+    }
+
+    /// Change password for the currently authenticated staff user
+    /// (admin, receptionist, cleaner). Guests should use the guest change
+    /// password endpoint.
+    pub fn change_employee_password(
+        &self,
+        user_id: Uuid,
+        request: &ChangePasswordRequest,
+    ) -> AppResult<()> {
+        let mut conn = self
+            .pool
+            .get()
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        // Load user
+        let user: User = users::table
+            .find(user_id)
+            .first(&mut conn)
+            .map_err(|_| AppError::NotFound("User not found".to_string()))?;
+
+        // Disallow guests here
+        if user.role == UserRole::Guest {
+            return Err(AppError::Forbidden(
+                "Guests must use the guest password change endpoint".to_string(),
+            ));
+        }
+
+        // Cannot change password for deactivated accounts
+        if user.deactivated_at.is_some() {
+            return Err(AppError::ValidationError(
+                "Cannot change password for deactivated account".to_string(),
+            ));
+        }
+
+        // Verify current password
+        let password_valid =
+            Self::verify_password(&request.current_password, &user.password_hash)?;
+        if !password_valid {
+            return Err(AppError::Unauthorized(
+                "Current password is incorrect".to_string(),
+            ));
+        }
+
+        // Validate new password
+        if request.new_password.len() < 8 {
+            return Err(AppError::ValidationError(
+                "Password must be at least 8 characters".to_string(),
+            ));
+        }
+
+        // Hash and update
+        let hashed_password = Self::hash_password(&request.new_password)?;
+
+        diesel::update(users::table.find(user_id))
+            .set(users::password_hash.eq(&hashed_password))
+            .execute(&mut conn)
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        Ok(())
+    }
+
+    /// Change password for the currently authenticated guest user
+    pub fn change_guest_password(
+        &self,
+        user_id: Uuid,
+        request: &ChangePasswordRequest,
+    ) -> AppResult<()> {
+        let mut conn = self
+            .pool
+            .get()
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        // Load user
+        let user: User = users::table
+            .find(user_id)
+            .first(&mut conn)
+            .map_err(|_| AppError::NotFound("User not found".to_string()))?;
+
+        // Ensure user is a guest
+        if user.role != UserRole::Guest {
+            return Err(AppError::Forbidden(
+                "Only guest accounts can use this endpoint".to_string(),
+            ));
+        }
+
+        // Cannot change password for deactivated accounts
+        if user.deactivated_at.is_some() {
+            return Err(AppError::ValidationError(
+                "Cannot change password for deactivated account".to_string(),
+            ));
+        }
+
+        // Verify current password
+        let password_valid =
+            Self::verify_password(&request.current_password, &user.password_hash)?;
+        if !password_valid {
+            return Err(AppError::Unauthorized(
+                "Current password is incorrect".to_string(),
+            ));
+        }
+
+        // Reuse guest password validation rules
+        Self::validate_guest_password(&request.new_password)?;
+
+        // Hash and update
+        let hashed_password = Self::hash_password(&request.new_password)?;
+
+        diesel::update(users::table.find(user_id))
             .set(users::password_hash.eq(&hashed_password))
             .execute(&mut conn)
             .map_err(|e| AppError::DatabaseError(e.to_string()))?;

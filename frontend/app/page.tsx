@@ -389,6 +389,22 @@ export default function DashboardPage() {
             </Link>
           </>
         )}
+        {/* Self-service settings for all staff roles */}
+        <Link href="/staff/change-password">
+          <Card className="bg-slate-800/80 border-slate-700 hover:border-slate-500/60 transition-colors cursor-pointer group">
+            <CardHeader>
+              <div className="w-12 h-12 bg-linear-to-br from-slate-400 to-slate-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                <LogOut className="h-6 w-6 text-white" />
+              </div>
+              <CardTitle className="text-slate-100">
+                Change Password
+              </CardTitle>
+              <CardDescription className="text-slate-400">
+                Update your staff login password
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </Link>
       </div>
     </div>
   );

@@ -3,12 +3,13 @@
 //! Handles guest registration, login, and profile operations.
 
 use axum::{extract::State, http::StatusCode, Extension, Json};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::api::middleware::AuthUser;
 use crate::api::AppState;
 use crate::errors::AppError;
 use crate::models::GuestInfo;
+use crate::services::auth_service::ChangePasswordRequest;
 use crate::services::{AuthService, GuestAuthResponse, GuestLoginRequest, GuestRegisterRequest};
 
 /// Response wrapper for authentication (matches API contract)
@@ -25,6 +26,13 @@ impl From<GuestAuthResponse> for AuthResponse {
             token: response.token,
         }
     }
+}
+
+/// Change password DTO for guest users
+#[derive(Debug, Deserialize)]
+pub struct GuestChangePasswordDto {
+    pub current_password: String,
+    pub new_password: String,
 }
 
 /// POST /auth/register - Register a new guest account
@@ -134,4 +142,22 @@ pub async fn me(
     let guest_info = auth_service.get_guest_by_id(auth_user.user_id)?;
 
     Ok(Json(guest_info))
+}
+
+/// POST /auth/guest/change-password - Change password for authenticated guest
+pub async fn change_password(
+    State(state): State<AppState>,
+    Extension(auth_user): Extension<AuthUser>,
+    Json(payload): Json<GuestChangePasswordDto>,
+) -> Result<StatusCode, AppError> {
+    let auth_service = AuthService::new(state.pool.clone(), state.jwt_secret.clone());
+
+    let request = ChangePasswordRequest {
+        current_password: payload.current_password,
+        new_password: payload.new_password,
+    };
+
+    auth_service.change_guest_password(auth_user.user_id, &request)?;
+
+    Ok(StatusCode::NO_CONTENT)
 }

@@ -132,6 +132,8 @@ import {
   type UpdateEmployeeRequest,
   type ResetPasswordRequest,
   type EmployeeFilters,
+  type ChangePasswordRequest,
+  type GuestChangePasswordRequest,
 } from "./validators";
 
 /**
@@ -216,4 +218,26 @@ export async function resetEmployeePassword(
   request: ResetPasswordRequest
 ): Promise<void> {
   await apiClient.post(`/admin/employees/${employeeId}/reset-password`, request);
+}
+
+// === Self-service password change (staff + guest) ===
+
+/**
+ * Change password for the currently authenticated staff user.
+ * Uses the staff JWT from local storage.
+ */
+export async function changeMyPassword(
+  request: ChangePasswordRequest
+): Promise<void> {
+  await apiClient.post("/auth/change-password", request);
+}
+
+/**
+ * Change password for the currently authenticated guest user.
+ * Uses the guest JWT from local storage.
+ */
+export async function changeGuestPassword(
+  request: GuestChangePasswordRequest
+): Promise<void> {
+  await apiClient.post("/auth/guest/change-password", request);
 }

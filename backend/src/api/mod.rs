@@ -25,22 +25,44 @@ pub struct AppState {
 
 /// Create the API router with all routes
 pub fn create_router(state: AppState) -> Router {
-    // Staff auth routes
+    // Auth routes (staff + guests)
     let auth_routes = Router::new()
+        // Staff auth (public login)
         .route("/login", post(auth::login))
-        .route("/me", get(auth::me))
+        // Staff self endpoints (require authentication)
+        .route(
+            "/me",
+            get(auth::me).layer(axum_middleware::from_fn_with_state(
+                state.clone(),
+                middleware::require_auth,
+            )),
+        )
+        .route(
+            "/change-password",
+            post(auth::change_password).layer(axum_middleware::from_fn_with_state(
+                state.clone(),
+                middleware::require_auth,
+            )),
+        )
+        // Admin-only staff management
         .route("/users", post(auth::create_user))
         // Guest registration (public)
         .route("/register", post(guest_auth::register))
         // Guest login (public)
         .route("/guest/login", post(guest_auth::login))
-        // Guest me (requires guest auth)
+        // Guest self endpoints (require guest auth)
         .route(
             "/guest/me",
             get(guest_auth::me).layer(axum_middleware::from_fn_with_state(
                 state.clone(),
                 middleware::require_guest,
             )),
+        )
+        .route(
+            "/guest/change-password",
+            post(guest_auth::change_password).layer(
+                axum_middleware::from_fn_with_state(state.clone(), middleware::require_guest),
+            ),
         );
 
     // Public room routes (no auth required)

@@ -169,6 +169,14 @@ export default function GuestDashboardPage() {
             <span className="text-slate-400">Account Type</span>
             <span className="text-amber-400 capitalize">{user?.role}</span>
           </div>
+          <div className="pt-4 text-right">
+            <Link
+              href="/guest/change-password"
+              className="text-sm text-amber-400 hover:text-amber-300 underline underline-offset-4"
+            >
+              Change password
+            </Link>
+          </div>
         </CardContent>
       </Card>
     </div>

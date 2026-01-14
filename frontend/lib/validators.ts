@@ -20,6 +20,13 @@ export const LoginRequestSchema = z.object({
 });
 export type LoginRequest = z.infer<typeof LoginRequestSchema>;
 
+// Staff change password (self-service)
+export const ChangePasswordRequestSchema = z.object({
+  current_password: z.string().min(1, "Current password is required"),
+  new_password: z.string().min(8, "New password must be at least 8 characters"),
+});
+export type ChangePasswordRequest = z.infer<typeof ChangePasswordRequestSchema>;
+
 export const LoginResponseSchema = z.object({
   token: z.string(),
   user: z.object({
@@ -68,6 +75,18 @@ export const GuestLoginRequestSchema = z.object({
   password: z.string().min(1, "Password is required"),
 });
 export type GuestLoginRequest = z.infer<typeof GuestLoginRequestSchema>;
+
+// Guest change password (self-service)
+export const GuestChangePasswordRequestSchema = z.object({
+  current_password: z.string().min(1, "Current password is required"),
+  new_password: z.string()
+    .min(8, "Password must be at least 8 characters")
+    .regex(/[a-zA-Z]/, "Password must contain at least one letter")
+    .regex(/[0-9]/, "Password must contain at least one number"),
+});
+export type GuestChangePasswordRequest = z.infer<
+  typeof GuestChangePasswordRequestSchema
+>;
 
 export const GuestAuthResponseSchema = z.object({
   token: z.string(),
