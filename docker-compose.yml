@@ -11,7 +11,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backend/migrations:/migrations:ro
-      - ./scripts/init-db:/docker-entrypoint-initdb.d:ro
+      # - ./scripts/init-db:/docker-entrypoint-initdb.d:ro
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     healthcheck:
