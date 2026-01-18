@@ -44,6 +44,7 @@ pub struct Room {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub price: BigDecimal,
+    pub assigned_cleaner_id: Option<Uuid>,
 }
 
 /// New room for insertion
@@ -62,6 +63,7 @@ pub struct UpdateRoom {
     pub room_type: Option<RoomType>,
     pub status: Option<RoomStatus>,
     pub price: Option<BigDecimal>,
+    pub assigned_cleaner_id: Option<Option<Uuid>>,
 }
 
 impl RoomStatus {

@@ -70,6 +70,7 @@ diesel::table! {
         created_at -> Timestamptz,
         updated_at -> Timestamptz,
         price -> Numeric,
+        assigned_cleaner_id -> Nullable<Uuid>,
     }
 }
 
@@ -120,5 +121,6 @@ diesel::joinable!(bookings -> rooms (room_id));
 diesel::joinable!(bookings -> users (created_by_user_id));
 diesel::joinable!(payments -> bookings (booking_id));
 diesel::joinable!(payments -> users (created_by_user_id));
+diesel::joinable!(rooms -> users (assigned_cleaner_id));
 
 diesel::allow_tables_to_appear_in_same_query!(bookings, guest_interaction_notes, payments, rooms, users,);

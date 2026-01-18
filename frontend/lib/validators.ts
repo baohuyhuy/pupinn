@@ -84,6 +84,7 @@ export const RoomSchema = z.object({
   price: z.union([z.string(), z.number()]).optional(),
   created_at: z.string().datetime(),
   updated_at: z.string().datetime(),
+  assigned_cleaner_id: z.string().uuid().nullable().optional(),
 });
 export type Room = z.infer<typeof RoomSchema>;
 

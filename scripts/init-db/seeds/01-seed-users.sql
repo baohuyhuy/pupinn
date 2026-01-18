@@ -62,6 +62,42 @@ BEGIN
     RAISE NOTICE '  ⊘ Cleaner user already exists, skipping';
   END IF;
 
+  -- Check if cleaner2 user exists
+  IF NOT EXISTS (SELECT 1 FROM users WHERE username = 'cleaner2') THEN
+    INSERT INTO users (id, username, email, role, password_hash, full_name, created_at, updated_at)
+    VALUES (
+      '00000000-0000-0000-0000-000000000005'::uuid,
+      'cleaner2',
+      'cleaner2@pupinn.local',
+      'cleaner',
+      '$argon2id$v=19$m=19456,t=2,p=1$c6G23yKLofMCXxhATDfKFg$0FpBivdfAV1E8dh9M9JEofdPhehdEwOpr1x0gqY+3Yk',
+      'Second Cleaner',
+      NOW(),
+      NOW()
+    );
+    RAISE NOTICE '  ✓ Inserted cleaner2 user (username: cleaner2, password: cleaner123)';
+  ELSE
+    RAISE NOTICE '  ⊘ Cleaner2 user already exists, skipping';
+  END IF;
+
+  -- Check if cleaner3 user exists
+  IF NOT EXISTS (SELECT 1 FROM users WHERE username = 'cleaner3') THEN
+    INSERT INTO users (id, username, email, role, password_hash, full_name, created_at, updated_at)
+    VALUES (
+      '00000000-0000-0000-0000-000000000006'::uuid,
+      'cleaner3',
+      'cleaner3@pupinn.local',
+      'cleaner',
+      '$argon2id$v=19$m=19456,t=2,p=1$c6G23yKLofMCXxhATDfKFg$0FpBivdfAV1E8dh9M9JEofdPhehdEwOpr1x0gqY+3Yk',
+      'Third Cleaner',
+      NOW(),
+      NOW()
+    );
+    RAISE NOTICE '  ✓ Inserted cleaner3 user (username: cleaner3, password: cleaner123)';
+  ELSE
+    RAISE NOTICE '  ⊘ Cleaner3 user already exists, skipping';
+  END IF;
+
   -- Check if guest user exists
   IF NOT EXISTS (SELECT 1 FROM users WHERE email = 'guest@example.com') THEN
     -- Insert guest user with hashed password for "guest123"

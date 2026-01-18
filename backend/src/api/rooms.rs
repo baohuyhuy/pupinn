@@ -28,6 +28,7 @@ pub struct CreateRoomDto {
 pub struct UpdateRoomDto {
     pub room_type: Option<RoomType>,
     pub status: Option<RoomStatus>,
+    pub assigned_cleaner_id: Option<Uuid>,
 }
 
 /// Query parameters for listing rooms
@@ -90,7 +91,13 @@ pub async fn update_room(
     Json(payload): Json<UpdateRoomDto>,
 ) -> Result<impl IntoResponse, AppError> {
     let room_service = RoomService::new(state.pool);
-    let room = room_service.update_room(id, payload.room_type, payload.status)?;
+    // Wrap the cleaner ID in Option<Option<Uuid>> to allow passing it through
+    // If payload.assigned_cleaner_id is Some(id), we pass Some(Some(id)).
+    // If it is None, we pass None (no change), unless we want to support unassigning via API.
+    // For now, let's assume if it's sent, we update it.
+    let assigned_id_update = payload.assigned_cleaner_id.map(Some);
+    
+    let room = room_service.update_room(id, payload.room_type, payload.status, assigned_id_update)?;
     Ok((StatusCode::OK, Json(room)))
 }
 
@@ -194,14 +201,31 @@ pub async fn update_cleaner_room_status(
         .get()
         .map_err(|e| AppError::DatabaseError(e.to_string()))?;
 
-    let rows_updated = diesel::update(
-        rooms_dsl::rooms
-            .filter(rooms_dsl::id.eq(id))
-            .filter(rooms_dsl::status.eq(current_room.status)),
-    )
-    .set(rooms_dsl::status.eq(payload.status))
-    .execute(&mut conn)
-    .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+    // Build update query - use tuple syntax when setting multiple fields
+    let rows_updated = if payload.status == RoomStatus::Available {
+        // If finishing cleaning, clear the assignment and update status
+        diesel::update(
+            rooms_dsl::rooms
+                .filter(rooms_dsl::id.eq(id))
+                .filter(rooms_dsl::status.eq(current_room.status)),
+        )
+        .set((
+            rooms_dsl::status.eq(payload.status),
+            rooms_dsl::assigned_cleaner_id.eq(None::<Uuid>),
+        ))
+        .execute(&mut conn)
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?
+    } else {
+        // Only update status
+        diesel::update(
+            rooms_dsl::rooms
+                .filter(rooms_dsl::id.eq(id))
+                .filter(rooms_dsl::status.eq(current_room.status)),
+        )
+        .set(rooms_dsl::status.eq(payload.status))
+        .execute(&mut conn)
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?
+    };
 
     if rows_updated == 0 {
         return Err(AppError::Conflict(

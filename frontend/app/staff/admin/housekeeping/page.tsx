@@ -7,7 +7,7 @@ import { useEffect } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { RouteGuard } from "@/components/route-guard";
 import { CleanerDashboard } from "@/components/cleaner-dashboard";
-import { apiClient, getErrorMessage } from "@/lib/api-client";
+import { apiClient, getErrorMessage, listEmployees } from "@/lib/api-client";
 import { type Room, type RoomStatus } from "@/lib/validators";
 
 export default function AdminHousekeepingPage() {
@@ -39,25 +39,46 @@ export default function AdminHousekeepingPage() {
     enabled: isAuthenticated,
   });
 
+  // Fetch cleaners for assignment dropdown
+  const { data: cleanersData } = useQuery({
+    queryKey: ["cleaners-list"],
+    queryFn: () => listEmployees({ role: "cleaner" }),
+    enabled: isAuthenticated,
+  });
+
   const updateStatusMutation = useMutation({
     mutationFn: async ({ roomId, status }: { roomId: string; status: RoomStatus }) => {
-      // Use regular /rooms/:id endpoint for admin (not cleaner-specific endpoint)
+      // Use regular /rooms/:id endpoint for admin
       const response = await apiClient.patch<Room>(`/rooms/${roomId}`, { status });
       return response.data;
     },
     onSuccess: () => {
-      // Invalidate all room-related queries to ensure synchronization
       queryClient.invalidateQueries({ queryKey: ["cleaner-rooms"] });
       queryClient.invalidateQueries({ queryKey: ["rooms"] });
-      // Invalidate all availableRooms queries regardless of parameters
       queryClient.invalidateQueries({ predicate: (query) => 
         query.queryKey[0] === "availableRooms" 
       });
     },
   });
 
+  const assignCleanerMutation = useMutation({
+    mutationFn: async ({ roomId, cleanerId }: { roomId: string; cleanerId: string }) => {
+      const response = await apiClient.patch<Room>(`/rooms/${roomId}`, { 
+        assigned_cleaner_id: cleanerId 
+      });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["cleaner-rooms"] });
+    },
+  });
+
   const handleStatusUpdate = (roomId: string, status: RoomStatus) => {
     updateStatusMutation.mutate({ roomId, status });
+  };
+
+  const handleAssignCleaner = (roomId: string, cleanerId: string) => {
+    assignCleanerMutation.mutate({ roomId, cleanerId });
   };
 
   if (authLoading) {
@@ -83,10 +104,12 @@ export default function AdminHousekeepingPage() {
 
           <CleanerDashboard
             rooms={rooms || []}
+            cleaners={cleanersData?.employees}
             isLoading={isLoading}
             error={error ? new Error(getErrorMessage(error)) : null}
             onStatusUpdate={handleStatusUpdate}
-            isUpdating={updateStatusMutation.isPending}
+            onAssignCleaner={handleAssignCleaner}
+            isUpdating={updateStatusMutation.isPending || assignCleanerMutation.isPending}
           />
         </div>
       </div>

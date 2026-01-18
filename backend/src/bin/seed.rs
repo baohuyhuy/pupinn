@@ -1,4 +1,3 @@
-// bin/seed.rs
 use diesel::prelude::*;
 use diesel::associations::HasTable;
 use dotenvy::dotenv;
@@ -45,6 +44,8 @@ fn seed_users(conn: &mut PgConnection) {
         ("admin", "admin123", UserRole::Admin),
         ("reception", "reception123", UserRole::Receptionist),
         ("cleaner", "cleaner123", UserRole::Cleaner),
+        ("cleaner2", "cleaner123", UserRole::Cleaner),
+        ("cleaner3", "cleaner123", UserRole::Cleaner),
     ];
 
     for (username, password, role) in staff_users_data {
