@@ -169,6 +169,7 @@ impl RoomService {
     /// This bypasses the UI restriction that prevents editing an occupied room
     /// directly to available; that transition is allowed here as part of the
     /// controlled check-out flow.
+    #[allow(dead_code)]
     pub fn update_room_status(&self, room_id: Uuid, status: RoomStatus) -> AppResult<Room> {
         let mut conn = self
             .pool

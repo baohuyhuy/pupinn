@@ -12,8 +12,7 @@ use crate::db::DbPool;
 use crate::errors::{AppError, AppResult};
 use crate::models::{GuestInfo, NewGuestUser, NewUser, UpdateUser, User, UserInfo, UserRole};
 // We import the users module, but NOT dsl::* to avoid variable name conflicts
-use crate::schema::users; 
-use crate::schema::users::dsl::*;
+use crate::schema::users;
 
 /// JWT claims structure
 #[derive(Debug, Serialize, Deserialize)]

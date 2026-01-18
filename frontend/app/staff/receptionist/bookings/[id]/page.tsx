@@ -2,9 +2,9 @@
 
 import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { ArrowLeft, User, Calendar, BedDouble } from "lucide-react";
+import { ArrowLeft, User, Calendar, BedDouble, DollarSign } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +13,20 @@ import { useAuth } from "@/components/auth-provider";
 import { RouteGuard } from "@/components/route-guard";
 import { apiClient, getErrorMessage } from "@/lib/api-client";
 import { type BookingWithRoom } from "@/components/booking-list";
+import { PaymentSummary } from "@/components/payment-summary";
+import { PaymentList } from "@/components/payment-list";
+import { PaymentForm } from "@/components/payment-form";
+import {
+  createPayment,
+  getPaymentsByBooking,
+  getPaymentSummary,
+  deletePayment,
+  updatePayment,
+  type CreatePaymentRequest,
+  type UpdatePaymentRequest,
+} from "@/lib/api/payments";
+import { useToast } from "@/hooks/use-toast";
+import type { Payment } from "@/lib/validators";
 
 export default function ReceptionistBookingDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -25,6 +39,11 @@ export default function ReceptionistBookingDetailPage({ params }: { params: Prom
     }
   }, [authLoading, isAuthenticated, router]);
 
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [paymentFormOpen, setPaymentFormOpen] = useState(false);
+  const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
+
   const { data: booking, isLoading, error } = useQuery({
     queryKey: ["booking", id],
     queryFn: async () => {
@@ -33,6 +52,101 @@ export default function ReceptionistBookingDetailPage({ params }: { params: Prom
     },
     enabled: !!id && isAuthenticated,
   });
+
+  const { data: paymentSummary, isLoading: isLoadingSummary } = useQuery({
+    queryKey: ["paymentSummary", id],
+    queryFn: () => getPaymentSummary(id),
+    enabled: !!id && isAuthenticated,
+  });
+
+  const { data: payments, isLoading: isLoadingPayments } = useQuery({
+    queryKey: ["payments", id],
+    queryFn: () => getPaymentsByBooking(id),
+    enabled: !!id && isAuthenticated,
+  });
+
+  const createPaymentMutation = useMutation({
+    mutationFn: (data: CreatePaymentRequest) => createPayment(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["payments", id] });
+      queryClient.invalidateQueries({ queryKey: ["paymentSummary", id] });
+      toast({
+        title: "Success",
+        description: "Payment recorded successfully",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: getErrorMessage(error),
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updatePaymentMutation = useMutation({
+    mutationFn: ({ paymentId, data }: { paymentId: string; data: UpdatePaymentRequest }) =>
+      updatePayment(paymentId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["payments", id] });
+      queryClient.invalidateQueries({ queryKey: ["paymentSummary", id] });
+      toast({
+        title: "Success",
+        description: "Payment updated successfully",
+      });
+      setEditingPayment(null);
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: getErrorMessage(error),
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deletePaymentMutation = useMutation({
+    mutationFn: (paymentId: string) => deletePayment(paymentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["payments", id] });
+      queryClient.invalidateQueries({ queryKey: ["paymentSummary", id] });
+      toast({
+        title: "Success",
+        description: "Payment deleted successfully",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: getErrorMessage(error),
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handlePaymentSubmit = async (
+    data: CreatePaymentRequest | UpdatePaymentRequest
+  ) => {
+    if (editingPayment) {
+      await updatePaymentMutation.mutateAsync({
+        paymentId: editingPayment.id,
+        data: data as UpdatePaymentRequest,
+      });
+    } else {
+      await createPaymentMutation.mutateAsync(data as CreatePaymentRequest);
+    }
+  };
+
+  const handleEditPayment = (payment: Payment) => {
+    setEditingPayment(payment);
+    setPaymentFormOpen(true);
+  };
+
+  const handleDeletePayment = (paymentId: string) => {
+    if (confirm("Are you sure you want to delete this payment?")) {
+      deletePaymentMutation.mutate(paymentId);
+    }
+  };
 
   if (authLoading || isLoading) {
     return (
@@ -155,6 +269,53 @@ export default function ReceptionistBookingDetailPage({ params }: { params: Prom
               </CardContent>
             </Card>
           </div>
+
+          {/* Payment Section */}
+          <div className="mt-6 space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2">
+                <DollarSign className="h-5 w-5 text-amber-500" />
+                Payments
+              </h2>
+              <Button
+                onClick={() => {
+                  setEditingPayment(null);
+                  setPaymentFormOpen(true);
+                }}
+                className="bg-amber-500 hover:bg-amber-600 text-white"
+              >
+                <DollarSign className="h-4 w-4 mr-2" />
+                Record Payment
+              </Button>
+            </div>
+
+            <PaymentSummary
+              summary={paymentSummary || null}
+              isLoading={isLoadingSummary}
+            />
+
+            <PaymentList
+              payments={payments || []}
+              isLoading={isLoadingPayments}
+              onEdit={handleEditPayment}
+              onDelete={handleDeletePayment}
+              canEdit={true}
+            />
+          </div>
+
+          <PaymentForm
+            bookingId={id}
+            paymentSummary={paymentSummary || null}
+            payment={editingPayment}
+            open={paymentFormOpen}
+            onOpenChange={(open) => {
+              setPaymentFormOpen(open);
+              if (!open) {
+                setEditingPayment(null);
+              }
+            }}
+            onSubmit={handlePaymentSubmit}
+          />
         </div>
       </div>
     </RouteGuard>

@@ -78,6 +78,16 @@ pub struct BookingWithRoom {
     pub room: Option<Room>,
 }
 
+/// Booking with room and payment summary for API responses
+#[allow(dead_code)]
+#[derive(Debug, Clone, Serialize)]
+pub struct BookingWithPayments {
+    #[serde(flatten)]
+    pub booking: Booking,
+    pub room: Option<Room>,
+    pub payment_summary: Option<super::PaymentSummary>,
+}
+
 impl BookingStatus {
     /// Check if transition to new status is valid
     pub fn can_transition_to(&self, new_status: BookingStatus) -> bool {

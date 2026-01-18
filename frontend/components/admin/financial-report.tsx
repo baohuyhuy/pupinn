@@ -26,6 +26,7 @@ interface FinancialReportProps {
   error: Error | null;
   startDate: string;
   endDate: string;
+  usePayments?: boolean;
   onDateRangeChange: (start: string, end: string) => void;
 }
 
@@ -35,6 +36,7 @@ export function FinancialReport({
   error,
   startDate,
   endDate,
+  usePayments,
   onDateRangeChange,
 }: FinancialReportProps) {
   const [localStartDate, setLocalStartDate] = useState(startDate);
@@ -96,37 +98,39 @@ export function FinancialReport({
           <CardTitle className="text-slate-100">Date Range Filter</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-4 items-end">
-            <div className="flex-1">
-              <Label htmlFor="start-date" className="text-slate-300">
-                Start Date
-              </Label>
-              <Input
-                id="start-date"
-                type="date"
-                value={localStartDate}
-                onChange={(e) => setLocalStartDate(e.target.value)}
-                className="bg-slate-700/50 border-slate-600 text-slate-100 mt-1"
-              />
+          <div className="space-y-4">
+            <div className="flex gap-4 items-end">
+              <div className="flex-1">
+                <Label htmlFor="start-date" className="text-slate-300">
+                  Start Date
+                </Label>
+                <Input
+                  id="start-date"
+                  type="date"
+                  value={localStartDate}
+                  onChange={(e) => setLocalStartDate(e.target.value)}
+                  className="bg-slate-700/50 border-slate-600 text-slate-100 mt-1"
+                />
+              </div>
+              <div className="flex-1">
+                <Label htmlFor="end-date" className="text-slate-300">
+                  End Date
+                </Label>
+                <Input
+                  id="end-date"
+                  type="date"
+                  value={localEndDate}
+                  onChange={(e) => setLocalEndDate(e.target.value)}
+                  className="bg-slate-700/50 border-slate-600 text-slate-100 mt-1"
+                />
+              </div>
+              <Button
+                onClick={handleApplyDateRange}
+                className="bg-amber-500 text-slate-900 hover:bg-amber-400"
+              >
+                Apply Filter
+              </Button>
             </div>
-            <div className="flex-1">
-              <Label htmlFor="end-date" className="text-slate-300">
-                End Date
-              </Label>
-              <Input
-                id="end-date"
-                type="date"
-                value={localEndDate}
-                onChange={(e) => setLocalEndDate(e.target.value)}
-                className="bg-slate-700/50 border-slate-600 text-slate-100 mt-1"
-              />
-            </div>
-            <Button
-              onClick={handleApplyDateRange}
-              className="bg-amber-500 text-slate-900 hover:bg-amber-400"
-            >
-              Apply Filter
-            </Button>
           </div>
         </CardContent>
       </Card>
@@ -137,7 +141,9 @@ export function FinancialReport({
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-400 mb-1">Total Revenue</p>
+                <p className="text-sm text-slate-400 mb-1">
+                  Total Revenue
+                </p>
                 <p className="text-2xl font-bold text-slate-100">
                   {formatCurrency(totalRevenue.toFixed(0))}
                 </p>

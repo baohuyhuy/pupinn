@@ -3,7 +3,6 @@ use diesel::prelude::*;
 use diesel_derive_enum::DbEnum;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use diesel::dsl::now;
 
 use crate::schema::users;
 

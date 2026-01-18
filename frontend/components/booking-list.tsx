@@ -205,7 +205,7 @@ export function BookingList({
                         size="sm"
                         className="text-slate-400 hover:text-slate-100"
                       >
-                        View
+                        Details
                       </Button>
                     </Link>
                     {booking.status === "upcoming" && onCheckIn && (

@@ -1,6 +1,5 @@
 use axum::{
     extract::{Extension, Path, Query, State},
-    http::StatusCode,
     response::IntoResponse,
     Json,
 };
@@ -18,6 +17,8 @@ use crate::utils::validate_date_format;
 pub struct DateRangeQuery {
     pub start_date: Option<String>, // YYYY-MM-DD format
     pub end_date: Option<String>,   // YYYY-MM-DD format
+    #[serde(default)]
+    pub use_payments: Option<bool>, // Use actual payments instead of booking prices
 }
 
 /// Room financial summary response
@@ -43,6 +44,8 @@ pub struct RoomFinancialsResponse {
     pub booking_count: i64,
     pub average_revenue: Option<String>,
     pub occupancy_rate: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub from_payments: Option<bool>, // Indicates if revenue is from actual payments
 }
 
 impl From<crate::services::RoomFinancials> for RoomFinancialsResponse {
@@ -52,6 +55,20 @@ impl From<crate::services::RoomFinancials> for RoomFinancialsResponse {
             booking_count: financials.booking_count,
             average_revenue: financials.average_revenue.map(|v| v.to_string()),
             occupancy_rate: financials.occupancy_rate,
+            from_payments: None,
+        }
+    }
+}
+
+/// Helper to create response with payment flag
+impl RoomFinancialsResponse {
+    pub fn from_financials_with_flag(financials: crate::services::RoomFinancials, from_payments: bool) -> Self {
+        Self {
+            total_revenue: financials.total_revenue.to_string(),
+            booking_count: financials.booking_count,
+            average_revenue: financials.average_revenue.map(|v| v.to_string()),
+            occupancy_rate: financials.occupancy_rate,
+            from_payments: Some(from_payments),
         }
     }
 }
@@ -62,6 +79,9 @@ pub struct CompareRoomsRequest {
     pub room_ids: Vec<Uuid>,
     pub start_date: Option<String>,
     pub end_date: Option<String>,
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub use_payments: Option<bool>, // Use actual payments instead of booking prices
 }
 
 /// Compare rooms response
@@ -94,12 +114,14 @@ pub async fn list_rooms_with_financials(
     let rooms = room_service.list_rooms(None, None)?;
 
     // Calculate financials for each room
+    let use_payments = query.use_payments.unwrap_or(false);
     let mut summaries = Vec::new();
     for room in rooms {
-        let financials = booking_service.calculate_room_financials(
+        let financials = booking_service.calculate_room_financials_with_payments(
             room.id,
             start_date,
             end_date,
+            use_payments,
         )?;
 
         summaries.push(RoomFinancialSummary {
@@ -162,7 +184,13 @@ pub async fn get_room_financials(
     }
 
     // Calculate financials
-    let financials = booking_service.calculate_room_financials(room_id, start_date, end_date)?;
+    let use_payments = query.use_payments.unwrap_or(false);
+    let financials = booking_service.calculate_room_financials_with_payments(
+        room_id,
+        start_date,
+        end_date,
+        use_payments,
+    )?;
 
     Ok(Json(RoomFinancialSummary {
         room: RoomSummary {
@@ -171,7 +199,7 @@ pub async fn get_room_financials(
             room_type: format!("{:?}", room.room_type),
             status: format!("{:?}", room.status),
         },
-        financials: financials.into(),
+        financials: RoomFinancialsResponse::from_financials_with_flag(financials, use_payments),
     }))
 }
 
@@ -216,7 +244,15 @@ pub async fn compare_rooms(
         // Verify room exists
         let room = room_service.get_room_by_id(room_id)?;
 
-        let financials = booking_service.calculate_room_financials(room_id, start_date, end_date)?;
+        let use_payments = request.start_date.as_ref().and_then(|_| Some(false))
+            .or_else(|| request.end_date.as_ref().and_then(|_| Some(false)))
+            .unwrap_or(false);
+        let financials = booking_service.calculate_room_financials_with_payments(
+            room_id,
+            start_date,
+            end_date,
+            use_payments,
+        )?;
 
         summaries.push(RoomFinancialSummary {
             room: RoomSummary {

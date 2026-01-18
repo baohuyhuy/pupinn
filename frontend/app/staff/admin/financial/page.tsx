@@ -18,6 +18,7 @@ export default function AdminFinancialPage() {
     format(subDays(new Date(), 30), "yyyy-MM-dd")
   );
   const [endDate, setEndDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [usePayments, setUsePayments] = useState(false);
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -32,9 +33,9 @@ export default function AdminFinancialPage() {
     error,
     refetch,
   } = useQuery<RoomFinancialSummary[]>({
-    queryKey: ["financial", "rooms", startDate, endDate],
+    queryKey: ["financial", "rooms", startDate, endDate, usePayments],
     queryFn: async () => {
-      return await listRoomsWithFinancials(startDate, endDate);
+      return await listRoomsWithFinancials(startDate, endDate, usePayments);
     },
     enabled: isAuthenticated,
   });
@@ -77,6 +78,7 @@ export default function AdminFinancialPage() {
             error={error}
             startDate={startDate}
             endDate={endDate}
+            usePayments={usePayments}
             onDateRangeChange={handleDateRangeChange}
           />
         </div>

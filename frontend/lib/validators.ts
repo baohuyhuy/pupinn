@@ -322,6 +322,7 @@ export const CompareRoomsRequestSchema = z.object({
   room_ids: z.array(z.string().uuid()),
   start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
   end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  use_payments: z.boolean().optional(),
 });
 export type CompareRoomsRequest = z.infer<typeof CompareRoomsRequestSchema>;
 
@@ -374,4 +375,55 @@ export const AddGuestNoteRequestSchema = z.object({
   note: z.string().min(1, "Note cannot be empty").max(10000, "Note must be 10,000 characters or less"),
 });
 export type AddGuestNoteRequest = z.infer<typeof AddGuestNoteRequestSchema>;
+
+// === Payment Schemas ===
+export const PaymentType = z.enum(["deposit", "partial", "full", "refund"]);
+export type PaymentType = z.infer<typeof PaymentType>;
+
+export const PaymentMethod = z.enum(["cash", "card", "bank_transfer", "other"]);
+export type PaymentMethod = z.infer<typeof PaymentMethod>;
+
+export const PaymentSchema = z.object({
+  id: z.string().uuid(),
+  booking_id: z.string().uuid(),
+  amount: z.string(), // Decimal as string
+  payment_type: PaymentType,
+  payment_method: z.string(),
+  notes: z.string().nullable().optional(),
+  created_by_user_id: z.string().uuid(),
+  created_at: z.string().datetime(),
+  updated_at: z.string().datetime(),
+});
+export type Payment = z.infer<typeof PaymentSchema>;
+
+export const PaymentSummarySchema = z.object({
+  booking_id: z.string().uuid(),
+  total_price: z.string(), // Decimal as string
+  total_paid: z.string(), // Decimal as string
+  remaining_balance: z.string(), // Decimal as string
+  payment_count: z.number(),
+});
+export type PaymentSummary = z.infer<typeof PaymentSummarySchema>;
+
+export const CreatePaymentRequestSchema = z.object({
+  amount: z.string().refine(
+    (val) => {
+      const num = parseFloat(val);
+      return !isNaN(num) && num !== 0;
+    },
+    { message: "Amount must be a non-zero number" }
+  ),
+  payment_type: PaymentType,
+  payment_method: z.string().min(1, "Payment method is required"),
+  notes: z.string().optional().nullable(),
+});
+export type CreatePaymentRequest = z.infer<typeof CreatePaymentRequestSchema>;
+
+export const UpdatePaymentRequestSchema = z.object({
+  amount: z.string().optional(),
+  payment_type: PaymentType.optional(),
+  payment_method: z.string().optional(),
+  notes: z.string().optional().nullable(),
+});
+export type UpdatePaymentRequest = z.infer<typeof UpdatePaymentRequestSchema>;
 

@@ -11,7 +11,8 @@ import type {
  */
 export async function listRoomsWithFinancials(
   startDate?: string,
-  endDate?: string
+  endDate?: string,
+  usePayments?: boolean
 ): Promise<RoomFinancialSummary[]> {
   const params: Record<string, string> = {};
   if (startDate) {
@@ -19,6 +20,9 @@ export async function listRoomsWithFinancials(
   }
   if (endDate) {
     params.end_date = endDate;
+  }
+  if (usePayments !== undefined) {
+    params.use_payments = usePayments.toString();
   }
   const response = await apiClient.get<RoomFinancialSummary[]>(
     "/admin/financial/rooms",
@@ -33,7 +37,8 @@ export async function listRoomsWithFinancials(
 export async function getRoomFinancials(
   roomId: string,
   startDate?: string,
-  endDate?: string
+  endDate?: string,
+  usePayments?: boolean
 ): Promise<RoomFinancialSummary> {
   const params: Record<string, string> = {};
   if (startDate) {
@@ -41,6 +46,9 @@ export async function getRoomFinancials(
   }
   if (endDate) {
     params.end_date = endDate;
+  }
+  if (usePayments !== undefined) {
+    params.use_payments = usePayments.toString();
   }
   const response = await apiClient.get<RoomFinancialSummary>(
     `/admin/financial/rooms/${roomId}`,

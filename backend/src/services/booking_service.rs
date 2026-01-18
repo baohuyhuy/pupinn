@@ -44,7 +44,7 @@ impl DatabaseErrorInformation for StringError {
 use crate::db::DbPool;
 use crate::errors::{AppError, AppResult};
 use crate::models::{
-    Booking, BookingStatus, BookingWithRoom, NewBooking, Room, RoomStatus, RoomType, UpdateBooking,
+    Booking, BookingStatus, BookingWithRoom, BookingWithPayments, NewBooking, Room, RoomStatus, RoomType, UpdateBooking,
 };
 use crate::schema::{bookings, rooms};
 
@@ -70,6 +70,7 @@ impl BookingService {
     }
 
     /// Get default price for a room type
+    #[allow(dead_code)]
     fn get_default_price_for_room_type(room_type: RoomType) -> BigDecimal {
         match room_type {
             // Default prices in VND
@@ -324,6 +325,22 @@ impl BookingService {
         Ok(BookingWithRoom { booking, room })
     }
 
+    /// Get a booking with room and payment summary
+    #[allow(dead_code)]
+    pub fn get_booking_with_payments(&self, booking_id: Uuid) -> AppResult<BookingWithPayments> {
+        let booking_with_room = self.get_booking_with_room(booking_id)?;
+        
+        // Get payment summary
+        let payment_service = crate::services::PaymentService::new(self.pool.clone());
+        let payment_summary = payment_service.get_payment_summary(booking_id).ok();
+        
+        Ok(BookingWithPayments {
+            booking: booking_with_room.booking,
+            room: booking_with_room.room,
+            payment_summary,
+        })
+    }
+
     /// List bookings with optional filters
     pub fn list_bookings(
         &self,
@@ -378,6 +395,7 @@ impl BookingService {
         Ok(result)
     }
 
+    #[allow(dead_code)]
     pub fn get_guest_bookings(
         &self,
         guest_name_input: &str,
@@ -835,11 +853,23 @@ impl BookingService {
     }
 
     /// Calculate financial metrics for a room
+    #[allow(dead_code)]
     pub fn calculate_room_financials(
         &self,
         room_id: Uuid,
         start_date: Option<NaiveDate>,
         end_date: Option<NaiveDate>,
+    ) -> AppResult<RoomFinancials> {
+        self.calculate_room_financials_with_payments(room_id, start_date, end_date, false)
+    }
+
+    /// Calculate financial metrics for a room, optionally using actual payments
+    pub fn calculate_room_financials_with_payments(
+        &self,
+        room_id: Uuid,
+        start_date: Option<NaiveDate>,
+        end_date: Option<NaiveDate>,
+        _use_payments: bool,
     ) -> AppResult<RoomFinancials> {
         let mut conn = self
             .pool

@@ -6,11 +6,12 @@ pub mod guest_auth;
 pub mod guest_bookings;
 pub mod guests;
 pub mod middleware;
+pub mod payments;
 pub mod rooms;
 
 use axum::{
     middleware as axum_middleware,
-    routing::{get, patch, post, delete},
+    routing::{get, patch, post},
     Router,
 };
 
@@ -71,6 +72,22 @@ pub fn create_router(state: AppState) -> Router {
         .merge(public_room_routes)
         .merge(protected_room_routes);
 
+    // Payment routes for bookings (requires staff auth)
+    let booking_payment_routes = Router::new()
+        .route(
+            "/:id/payments",
+            get(payments::list_payments).post(payments::create_payment),
+        )
+        .route("/:id/payments/summary", get(payments::get_payment_summary))
+        .layer(axum_middleware::from_fn_with_state(
+            state.clone(),
+            middleware::require_staff,
+        ))
+        .layer(axum_middleware::from_fn_with_state(
+            state.clone(),
+            middleware::require_auth,
+        ));
+
     let booking_routes = Router::new()
         .route(
             "/",
@@ -86,7 +103,20 @@ pub fn create_router(state: AppState) -> Router {
         .route(
             "/reference/:reference",
             get(bookings::get_booking_by_reference),
-        );
+        )
+        .merge(booking_payment_routes);
+
+    // Payment routes (requires staff auth)
+    let payment_routes = Router::new()
+        .route("/:id", get(payments::get_payment).patch(payments::update_payment).delete(payments::delete_payment))
+        .layer(axum_middleware::from_fn_with_state(
+            state.clone(),
+            middleware::require_staff,
+        ))
+        .layer(axum_middleware::from_fn_with_state(
+            state.clone(),
+            middleware::require_auth,
+        ));
 
     // Guest booking routes (requires guest auth)
     let guest_booking_routes = Router::new()
@@ -164,6 +194,7 @@ pub fn create_router(state: AppState) -> Router {
         .nest("/auth", auth_routes)
         .nest("/rooms", room_routes)
         .nest("/bookings", booking_routes)
+        .nest("/payments", payment_routes)
         .nest("/guest/bookings", guest_booking_routes)
         .nest("/cleaner", cleaner_routes)
         .nest(
