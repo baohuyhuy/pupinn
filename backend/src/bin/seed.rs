@@ -4,7 +4,7 @@ use dotenvy::dotenv;
 use bigdecimal::BigDecimal;
 use std::str::FromStr;
 use std::env;
-use chrono::{Utc, Duration, NaiveDate}; // Needed for booking dates
+use chrono::{Utc, Duration, NaiveDate};
 
 // Import from the main crate
 use hotel_management_backend::db::create_pool;
@@ -14,6 +14,11 @@ use hotel_management_backend::models::{
 };
 use hotel_management_backend::schema::{rooms, users, bookings};
 use hotel_management_backend::services::AuthService;
+
+use hotel_management_backend::models::{NewInventoryItem, InventoryStatus};
+use hotel_management_backend::schema::inventory_items;
+use bigdecimal::BigDecimal;
+use std::str::FromStr;
 
 fn main() {
     dotenv().ok();
@@ -32,6 +37,9 @@ fn main() {
 
     // 3. Seed Bookings
     seed_bookings(&mut conn);
+
+    // 4. Seed Bookings
+    seed_inventory($mut conn)
 
     println!("\n✅ Database seeding complete!");
 }
@@ -322,4 +330,60 @@ fn seed_bookings(conn: &mut PgConnection) {
              }
          }
      }
+}
+
+async fn seed_inventory(pool: &DbPool) {
+    let mut conn = pool.get().expect("Failed to get DB connection");
+    
+    let items = vec![
+        NewInventoryItem {
+            name: "Broom".to_string(),
+            description: Some("Standard heavy-duty broom".to_string()),
+            quantity: 10,
+            price: BigDecimal::from_str("15.50").unwrap(),
+            status: Some(InventoryStatus::Normal),
+            notes: None,
+        },
+        NewInventoryItem {
+            name: "Mop Head".to_string(),
+            description: Some("Cotton mop replacement head".to_string()),
+            quantity: 25,
+            price: BigDecimal::from_str("5.00").unwrap(),
+            status: Some(InventoryStatus::Normal),
+            notes: None,
+        },
+        NewInventoryItem {
+            name: "Toilet Cleaner".to_string(),
+            description: Some("1L Bottle".to_string()),
+            quantity: 5,
+            price: BigDecimal::from_str("3.20").unwrap(),
+            status: Some(InventoryStatus::LowStock),
+            notes: Some("Order more next week".to_string()),
+        },
+        NewInventoryItem {
+            name: "Vacuum Cleaner (Industrial)".to_string(),
+            description: Some("Model X-2000".to_string()),
+            quantity: 2,
+            price: BigDecimal::from_str("250.00").unwrap(),
+            status: Some(InventoryStatus::Broken),
+            notes: Some("One unit has a broken hose".to_string()),
+        },
+        NewInventoryItem {
+            name: "Scrubber".to_string(),
+            description: None,
+            quantity: 50,
+            price: BigDecimal::from_str("1.50").unwrap(),
+            status: Some(InventoryStatus::Normal),
+            notes: None,
+        },
+    ];
+
+    for item in items {
+        diesel::insert_into(inventory_items::table)
+            .values(&item)
+            .execute(&mut conn)
+            .unwrap_or_else(|_| 0); // Ignore if exists or error
+    }
+    
+    println!("Inventory seeded successfully!");
 }

@@ -20,6 +20,10 @@ pub mod sql_types {
     #[derive(diesel::query_builder::QueryId, diesel::sql_types::SqlType)]
     #[diesel(postgres_type(name = "payment_type"))]
     pub struct PaymentType;
+
+    #[derive(diesel::query_builder::QueryId, diesel::sql_types::SqlType)]
+    #[diesel(postgres_type(name = "inventory_status"))]
+    pub struct InventoryStatus;
 }
 
 diesel::table! {
@@ -117,10 +121,35 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    use diesel::sql_types::*;
+    use super::sql_types::InventoryStatus;
+
+    inventory_items (id) {
+        id -> Uuid,
+        #[max_length = 100]
+        name -> Varchar,
+        description -> Nullable<Text>,
+        quantity -> Int4,
+        price -> Numeric,
+        status -> InventoryStatus,
+        notes -> Nullable<Text>,
+        created_at -> Timestamptz,
+        updated_at -> Timestamptz,
+    }
+}
+
 diesel::joinable!(bookings -> rooms (room_id));
 diesel::joinable!(bookings -> users (created_by_user_id));
 diesel::joinable!(payments -> bookings (booking_id));
 diesel::joinable!(payments -> users (created_by_user_id));
 diesel::joinable!(rooms -> users (assigned_cleaner_id));
 
-diesel::allow_tables_to_appear_in_same_query!(bookings, guest_interaction_notes, payments, rooms, users,);
+diesel::allow_tables_to_appear_in_same_query!(
+    bookings,
+    guest_interaction_notes,
+    inventory_items,
+    payments,
+    rooms,
+    users,
+);

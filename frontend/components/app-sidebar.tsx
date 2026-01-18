@@ -13,7 +13,8 @@ import {
   Shield,
   PawPrint,
   UserPlus,
-  Brush, // Added Brush icon for Cleaner
+  Brush,
+  Package,
 } from "lucide-react";
 
 import {
@@ -56,6 +57,7 @@ const CLEANER_NAVIGATION = [
     label: "Overview",
     items: [
       { title: "Dashboard", href: "/staff/cleaner/dashboard", icon: Brush },
+      { title: "Inventory", href: "/staff/cleaner/inventory", icon: Package },
     ],
   },
 ];
@@ -72,6 +74,7 @@ const ADMIN_NAVIGATION = [
       { title: "Employees", href: "/staff/admin/employees", icon: Users },
       { title: "Financial", href: "/staff/admin/financial", icon: NotebookPen },
       { title: "Guests", href: "/staff/admin/guests", icon: UserPlus },
+      { title: "Inventory", href: "/staff/admin/inventory", icon: Package },
     ],
   },
   {

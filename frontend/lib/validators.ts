@@ -428,3 +428,37 @@ export const UpdatePaymentRequestSchema = z.object({
 });
 export type UpdatePaymentRequest = z.infer<typeof UpdatePaymentRequestSchema>;
 
+
+export const InventoryStatus = z.enum([
+  "normal",
+  "low_stock",
+  "broken",
+  "lost",
+  "need_replacement",
+]);
+export type InventoryStatus = z.infer<typeof InventoryStatus>;
+
+export const InventoryItem = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1, "Name is required"),
+  description: z.string().nullable().optional(),
+  quantity: z.number().int().min(0, "Quantity must be 0 or greater"),
+  price: z.string().optional(), // Optional because Cleaners won't see it
+  status: InventoryStatus,
+  notes: z.string().nullable().optional(),
+  updated_at: z.string(),
+});
+export type InventoryItem = z.infer<typeof InventoryItem>;
+
+export const CreateInventoryItem = InventoryItem.pick({
+  name: true,
+  description: true,
+  quantity: true,
+  status: true,
+  notes: true,
+}).extend({
+  price: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid price format"),
+});
+export type CreateInventoryItem = z.infer<typeof CreateInventoryItem>;
+
+export const UpdateInventoryItem = CreateInventoryItem.partial();

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { format } from "date-fns";
-import { DollarSign, Calendar, TrendingUp, BarChart3, X } from "lucide-react";
+import { DollarSign, Calendar, TrendingUp, BarChart3, X, Package } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import {
   LineChart,
@@ -42,6 +42,7 @@ import {
   getRoomBookingHistory,
   type BookingWithRoom,
 } from "@/lib/api/financial";
+import { getInventoryValue } from "@/lib/api/inventory";
 
 interface FinancialReportProps {
   data: RoomFinancialSummary[];
@@ -108,6 +109,16 @@ export function FinancialReport({
     queryKey: ["room-booking-history", selectedRoomId, startDate, endDate],
     queryFn: () => getRoomBookingHistory(selectedRoomId!, startDate, endDate),
     enabled: isDetailsOpen && selectedRoomId !== null,
+  });
+
+  // Fetch inventory value
+  const {
+    data: inventoryValue,
+    isLoading: isLoadingInventoryValue,
+  } = useQuery({
+    queryKey: ["inventory-value"],
+    queryFn: getInventoryValue,
+    enabled: !isLoading && !error,
   });
 
   const handleDetailsClick = (roomId: string) => {
@@ -219,11 +230,31 @@ export function FinancialReport({
                 <p className="text-sm text-slate-400 mb-1">
                   Total Revenue
                 </p>
-                <p className="text-2xl font-bold text-slate-100">
+                <p className="text-2xl font-bold text-green-600">
                   {formatCurrency(totalRevenue.toFixed(0))}
                 </p>
               </div>
               <DollarSign className="h-8 w-8 text-emerald-400" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-slate-800/80 border-slate-700">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-400 mb-1">
+                  Total Inventory Cost
+                </p>
+                <p className="text-2xl font-bold text-red-500">
+                  {isLoadingInventoryValue ? (
+                    <span className="text-slate-400">Loading...</span>
+                  ) : (
+                    formatCurrency(inventoryValue?.total_inventory_value || "0")
+                  )}
+                </p>
+              </div>
+              <Package className="h-8 w-8 text-purple-400" />
             </div>
           </CardContent>
         </Card>

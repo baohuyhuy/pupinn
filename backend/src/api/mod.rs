@@ -8,10 +8,11 @@ pub mod guests;
 pub mod middleware;
 pub mod payments;
 pub mod rooms;
+pub mod inventory;
 
 use axum::{
     middleware as axum_middleware,
-    routing::{get, patch, post},
+    routing::{delete, get, patch, post},
     Router,
 };
 
@@ -193,6 +194,35 @@ pub fn create_router(state: AppState) -> Router {
     // Health check endpoint
     let health_route = Router::new().route("/health", get(health_check));
 
+    // Inventory Routes
+    // List/Update is accessible to Admin and Cleaner
+    let inventory_routes = Router::new()
+        .route("/", get(inventory::list_inventory))
+        .route("/:id", patch(inventory::update_inventory_item))
+        .layer(axum_middleware::from_fn_with_state(
+            state.clone(),
+            middleware::require_admin_or_cleaner, // Admin and Cleaner
+        ))
+        .layer(axum_middleware::from_fn_with_state(
+            state.clone(),
+            middleware::require_auth,
+        ));
+
+    // Admin-only Inventory Routes (Create, Delete)
+    let admin_inventory_routes = Router::new()
+        .route("/", post(inventory::create_inventory_item))
+        .route("/:id", delete(inventory::delete_inventory_item))
+        // New Financial Endpoint for Inventory
+        .route("/financial/inventory-value", get(inventory::get_inventory_value)) 
+        .layer(axum_middleware::from_fn_with_state(
+            state.clone(),
+            middleware::require_admin,
+        ))
+        .layer(axum_middleware::from_fn_with_state(
+            state.clone(),
+            middleware::require_auth,
+        ));
+
     Router::new()
         .nest("/auth", auth_routes)
         .nest("/rooms", room_routes)
@@ -206,6 +236,7 @@ pub fn create_router(state: AppState) -> Router {
                 .merge(admin_financial_routes)
                 .merge(admin_guest_routes),
         )
+        .nest("/inventory", inventory_routes.merge(admin_inventory_routes))
         .merge(health_route)
         .with_state(state)
 }

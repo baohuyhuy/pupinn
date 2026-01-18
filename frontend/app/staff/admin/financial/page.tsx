@@ -10,6 +10,7 @@ import { RouteGuard } from "@/components/route-guard";
 import { FinancialReport } from "@/components/admin/financial-report";
 import { listRoomsWithFinancials } from "@/lib/api/financial";
 import { type RoomFinancialSummary } from "@/lib/validators";
+import { getInventoryValue } from "@/lib/api/inventory";
 
 export default function AdminFinancialPage() {
   const router = useRouter();
