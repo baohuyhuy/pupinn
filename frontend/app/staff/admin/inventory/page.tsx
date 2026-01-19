@@ -153,7 +153,7 @@ export default function AdminInventoryPage() {
 
   return (
     <RouteGuard requiredRole="admin">
-      <div className="space-y-6">
+      <div className="space-y-6 px-8 py-8">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold text-slate-100">Inventory Management</h1>
           <Button onClick={handleAddNew} className="bg-amber-500 hover:bg-amber-600 text-slate-900">

@@ -7,7 +7,6 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-pupinn_db}
       POSTGRES_USER: ${POSTGRES_USER:-pupinn_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      LOAD_SEED_DATA: ${LOAD_SEED_DATA:-false}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backend/migrations:/migrations:ro
@@ -47,13 +46,21 @@ services:
     image: minio/mc
     depends_on:
       - minio
-    entrypoint: >
-      /bin/sh -c "
-      /usr/bin/mc alias set myminio http://minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin};
-      /usr/bin/mc mb myminio/chat-images;
-      /usr/bin/mc anonymous set download myminio/chat-images;
-      exit 0;
-      "
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        # Loop until connection is successful
+        until (/usr/bin/mc alias set myminio http://minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin}); do
+          echo 'MinIO not ready... waiting 5s...'
+          sleep 5
+        done
+
+        # Create bucket and set policy
+        /usr/bin/mc mb --ignore-existing myminio/chat-images
+        /usr/bin/mc anonymous set public myminio/chat-images
+
+        exit 0
     networks:
       - pupinn_network
 
