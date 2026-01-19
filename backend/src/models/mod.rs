@@ -4,6 +4,7 @@ pub mod payment;
 pub mod room;
 pub mod user;
 pub mod inventory;
+pub mod message;
 
 pub use booking::*;
 pub use guest_note::*;

@@ -4,6 +4,7 @@ pub mod guest_service;
 pub mod payment_service;
 pub mod room_service;
 pub mod inventory_service;
+pub mod storage_service;
 
 pub use auth_service::{AuthService, GuestAuthResponse, GuestLoginRequest, GuestRegisterRequest};
 pub use booking_service::{BookingService, RoomFinancials};

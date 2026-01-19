@@ -139,6 +139,19 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    messages (id) {
+        id -> Uuid,
+        sender_id -> Uuid,
+        receiver_id -> Uuid,
+        content -> Text,
+        image_url -> Nullable<Text>,
+        is_read -> Bool,
+        created_at -> Timestamptz,
+        updated_at -> Timestamptz,
+    }
+}
+
 diesel::joinable!(bookings -> rooms (room_id));
 diesel::joinable!(bookings -> users (created_by_user_id));
 diesel::joinable!(payments -> bookings (booking_id));
@@ -149,6 +162,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     bookings,
     guest_interaction_notes,
     inventory_items,
+    messages,
     payments,
     rooms,
     users,

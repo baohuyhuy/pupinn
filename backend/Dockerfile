@@ -14,10 +14,11 @@ RUN mkdir -p src/bin && \
     rm -rf src
 COPY backend/src ./src
 COPY backend/migrations ./migrations
-RUN cargo build --release --bin server
+RUN rm -rf target/release/server target/release/deps/*server* && \
+    cargo build --release --bin server
 
 
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 RUN apt-get update && \
     apt-get install -y libpq5 ca-certificates && \
     rm -rf /var/lib/apt/lists/*

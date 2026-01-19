@@ -22,6 +22,41 @@ services:
     networks:
       - pupinn_network
 
+  minio:
+    image: minio/minio
+    container_name: pupinn_minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_PROMETHEUS_AUTH_TYPE: public
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://minio:9000/minio/health/live" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - pupinn_network
+
+  minio-create-bucket:
+    image: minio/mc
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc alias set myminio http://minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin};
+      /usr/bin/mc mb myminio/chat-images;
+      /usr/bin/mc anonymous set download myminio/chat-images;
+      exit 0;
+      "
+    networks:
+      - pupinn_network
+
   backend:
     build: 
       context: .
@@ -35,12 +70,18 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      minio:
+        condition: service_started
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-pupinn_user}:${POSTGRES_PASSWORD:-dev_password_123}@postgres:5432/${POSTGRES_DB:-pupinn_db}
       - JWT_SECRET=${JWT_SECRET}
       - ALLOWED_ORIGIN=${ALLOWED_ORIGIN:-http://localhost:3000}
       - SERVER_HOST=0.0.0.0
       - SERVER_PORT=8080
+      - MINIO_URL=${MINIO_URL:-http://minio:9000}
+      - MINIO_PUBLIC_URL=${MINIO_PUBLIC_URL:-http://localhost:9000}
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minioadmin}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minioadmin}
     restart: unless-stopped
 
   frontend:
@@ -62,8 +103,9 @@ services:
 volumes:
   postgres_data:
     driver: local
+  minio_data:
+    driver: local
 
 networks:
   pupinn_network:
     driver: bridge
-

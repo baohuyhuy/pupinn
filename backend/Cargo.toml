@@ -17,7 +17,7 @@ path = "src/bin/seed.rs"
 
 [dependencies]
 # Web framework
-axum = { version = "0.7", features = ["macros"] }
+axum = { version = "0.7", features = ["macros", "ws", "multipart"] }
 tower = "0.5"
 tower-http = { version = "0.6", features = ["cors", "trace"] }
 
@@ -45,6 +45,10 @@ thiserror = "2"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 bigdecimal = { version = "0.4", features = ["serde"] }
+aws-config = "1.8.12"
+aws-sdk-s3 = "1.120.0"
+tokio-stream = "0.1.18"
+futures = "0.3.31"
 
 [dev-dependencies]
 tokio-test = "0.4"

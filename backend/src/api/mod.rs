@@ -1,5 +1,6 @@
 pub mod auth;
 pub mod bookings;
+pub mod chat;
 pub mod employees;
 pub mod financial;
 pub mod guest_auth;
@@ -17,12 +18,16 @@ use axum::{
 };
 
 use crate::db::DbPool;
+use crate::api::chat::ChatState;
+use std::sync::Arc;
 
 /// Application state shared across handlers
 #[derive(Clone)]
 pub struct AppState {
     pub pool: DbPool,
     pub jwt_secret: String,
+    pub chat_state: Arc<ChatState>,
+    pub s3_client: aws_sdk_s3::Client,
 }
 
 /// Create the API router with all routes
@@ -194,6 +199,20 @@ pub fn create_router(state: AppState) -> Router {
     // Health check endpoint
     let health_route = Router::new().route("/health", get(health_check));
 
+    // Chat routes (requires auth) - excluding WebSocket which does its own auth
+    let chat_routes = Router::new()
+        .route("/contacts", get(chat::get_contacts))
+        .route("/history", get(chat::get_chat_history))
+        .route("/upload", post(chat::upload_image))
+        .layer(axum_middleware::from_fn_with_state(
+            state.clone(),
+            middleware::require_auth,
+        ));
+
+    // WebSocket route - handles its own authentication via query parameter
+    let chat_ws_route = Router::new()
+        .route("/ws", get(chat::chat_websocket_handler));
+
     // Inventory Routes
     // List/Update is accessible to Admin and Cleaner
     let inventory_routes = Router::new()
@@ -237,6 +256,7 @@ pub fn create_router(state: AppState) -> Router {
                 .merge(admin_guest_routes),
         )
         .nest("/inventory", inventory_routes.merge(admin_inventory_routes))
+        .nest("/chat", chat_routes.merge(chat_ws_route))
         .merge(health_route)
         .with_state(state)
 }
