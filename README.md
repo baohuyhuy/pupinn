@@ -7,8 +7,9 @@ A modern hotel management system built as a student project for an Introduction 
 - **Backend**: Rust with Axum web framework
 - **Frontend**: Next.js 15 with React 19 and shadcn/ui
 - **Database**: PostgreSQL 16 (Dockerized) with Diesel ORM
+- **Object Storage**: MinIO for image storage
 - **Authentication**: JWT-based with Argon2id password hashing
-- **Infrastructure**: Docker Compose for database orchestration
+- **Infrastructure**: Docker Compose for database and object storage orchestration
 
 ## 📋 Features
 
@@ -18,14 +19,19 @@ A modern hotel management system built as a student project for an Introduction 
 - **Room Management**: Add rooms, update status (Available/Occupied/Maintenance/Dirty/Cleaning)
 - **Guest Check-in/Check-out**: Full guest lifecycle management (checkout now marks rooms Dirty)
 - **Dashboard**: Today's arrivals, departures, and room availability stats
-- **Cleaner Dashboard**: Visual status indicators (red/yellow/green) and cleaning workflow (Dirty → Cleaning → Available)
+- **Cleaner Dashboard**: Visual status indicators (red/yellow/green), cleaning workflow (Dirty → Cleaning → Available), and **Task Assignments**
+- **Chat System**: Real-time communication between guests and staff
+- **Financial Reports**: Beautiful and detailed financial performance reports
+- **Inventory Management**: Track and manage hotel supplies and inventory
+- **User Settings**: Change password and manage profile in the settings page
 
 ### User Roles
 
 - **Guest**: Self-register, login, search rooms, book rooms, view/cancel own bookings
 - **Receptionist**: Book rooms, check-in/out guests, view all bookings
-- **Admin**: All receptionist permissions + room management
-- **Cleaner**: Access cleaner dashboard to view Dirty/Cleaning/Available rooms, update statuses, and cannot set rooms to Occupied/Maintenance
+- **Admin**: All receptionist permissions + room management + inventory management + user management + financial reports. 
+- **Cleaner**: Access cleaner dashboard to view Dirty/Cleaning/Available rooms, update statuses, and cannot set rooms to Occupied/Maintenance. view/Report missing inventory items.
+- **Chat**: Real-time communication between guests and staff
 
 ### Guest Self-Service Portal
 
@@ -33,6 +39,8 @@ A modern hotel management system built as a student project for an Introduction 
 - **Room Search**: Search available rooms by date range and room type
 - **Self-Booking**: Book rooms directly without staff assistance
 - **Booking Management**: View own bookings and cancel upcoming reservations
+- **Chat**: Real-time communication between guests and staff
+- **User Settings**: Change password and manage profile in the settings page
 
 ## 🚀 Quick Start
 
@@ -43,19 +51,19 @@ A modern hotel management system built as a student project for an Introduction 
 - **Node.js** 20+ with pnpm
 - **Diesel CLI** (`cargo install diesel_cli --no-default-features --features postgres`)
 
-### 1. Database Setup (Dockerized)
+### 1. Infrastructure Setup
 
-The project uses a Dockerized PostgreSQL 16 database with **automatic migrations and seeding** on first initialization.
+The project uses Docker for PostgreSQL 16 and MinIO object storage.
 
 ```bash
-# Step 1: Create environment file and edit your own customize database settings
-mv .env.example .env
-# Step 1.1: Edit .env to customize database settings
+# Step 1: Create environment file
+cp .env.example .env
+# Step 1.1: Edit .env to customize settings if needed
 
-# Step 2: Start database container
-docker compose up -d postgres
+# Step 2: Start infrastructure containers
+docker compose up -d postgres minio minio-create-bucket
 
-# Step 3: Wait for container to be healthy (10-15 seconds)
+# Step 3: Wait for containers to be healthy
 docker compose ps
 ```
 
@@ -108,7 +116,16 @@ echo "NEXT_PUBLIC_API_URL=http://localhost:8080/api" > .env.local
 pnpm dev
 ```
 
-### 4. Access the Application
+### 4. Full Docker Setup (Alternative)
+
+For a complete setup including backend, frontend, and infrastructure, you can run:
+
+```bash
+# Run everything from the root directory
+docker compose up --build
+```
+
+### 5. Access the Application
 
 Open http://localhost:3000 in your browser.
 
