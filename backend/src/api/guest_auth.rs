@@ -9,7 +9,9 @@ use crate::api::middleware::AuthUser;
 use crate::api::AppState;
 use crate::errors::AppError;
 use crate::models::GuestInfo;
-use crate::services::{AuthService, GuestAuthResponse, GuestLoginRequest, GuestRegisterRequest};
+use crate::services::{
+    AuthService, ChangePasswordRequest, GuestAuthResponse, GuestLoginRequest, GuestRegisterRequest,
+};
 
 /// Response wrapper for authentication (matches API contract)
 #[derive(Debug, Serialize)]
@@ -134,4 +136,35 @@ pub async fn me(
     let guest_info = auth_service.get_guest_by_id(auth_user.user_id)?;
 
     Ok(Json(guest_info))
+}
+
+/// POST /auth/guest/change-password - Change guest password
+///
+/// Changes the authenticated guest user's password.
+/// Requires a valid guest JWT token and the current password.
+///
+/// # Request Body
+/// ```json
+/// {
+///   "current_password": "OldPassword123",
+///   "new_password": "NewSecurePass456"
+/// }
+/// ```
+///
+/// # Response (200 OK)
+/// No content on success.
+///
+/// # Errors
+/// - 401 Unauthorized: Incorrect current password or invalid token
+/// - 400 Bad Request: New password does not meet requirements
+pub async fn change_password(
+    State(state): State<AppState>,
+    Extension(auth_user): Extension<AuthUser>,
+    Json(payload): Json<ChangePasswordRequest>,
+) -> Result<StatusCode, AppError> {
+    let auth_service = AuthService::new(state.pool.clone(), state.jwt_secret.clone());
+
+    auth_service.change_password(auth_user.user_id, &payload)?;
+
+    Ok(StatusCode::OK)
 }

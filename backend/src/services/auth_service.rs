@@ -67,6 +67,14 @@ pub struct GuestLoginRequest {
     pub password: String,
 }
 
+/// Change password request payload
+#[derive(Debug, Deserialize)]
+pub struct ChangePasswordRequest {
+    pub current_password: String,
+    pub new_password: String,
+}
+
+
 /// Authentication service for user management and JWT operations
 pub struct AuthService {
     pool: DbPool,
@@ -817,7 +825,60 @@ impl AuthService {
 
         Ok(())
     }
+
+    /// Change password for any user (staff or guest)
+    pub fn change_password(&self, user_id: Uuid, request: &ChangePasswordRequest) -> AppResult<()> {
+        let mut conn = self
+            .pool
+            .get()
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        // Get the user
+        let user: User = users::table
+            .find(user_id)
+            .first(&mut conn)
+            .map_err(|_| AppError::NotFound("User not found".to_string()))?;
+
+        // Check if user is deactivated
+        if user.deactivated_at.is_some() {
+            return Err(AppError::ValidationError(
+                "Cannot change password for deactivated account".to_string(),
+            ));
+        }
+
+        // Verify current password
+        if !Self::verify_password(&request.current_password, &user.password_hash)? {
+            return Err(AppError::Unauthorized(
+                "Current password is incorrect".to_string(),
+            ));
+        }
+
+        // Validate new password based on user role
+        if user.role == UserRole::Guest {
+            // Guests have stricter password requirements
+            Self::validate_guest_password(&request.new_password)?;
+        } else {
+            // Staff users need at least 8 characters
+            if request.new_password.len() < 8 {
+                return Err(AppError::ValidationError(
+                    "Password must be at least 8 characters".to_string(),
+                ));
+            }
+        }
+
+        // Hash new password
+        let hashed_password = Self::hash_password(&request.new_password)?;
+
+        // Update password
+        diesel::update(users::table.find(user_id))
+            .set(users::password_hash.eq(&hashed_password))
+            .execute(&mut conn)
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        Ok(())
+    }
 }
+
 
 #[cfg(test)]
 mod tests {

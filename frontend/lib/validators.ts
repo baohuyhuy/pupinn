@@ -30,6 +30,17 @@ export const LoginResponseSchema = z.object({
 });
 export type LoginResponse = z.infer<typeof LoginResponseSchema>;
 
+export const ChangePasswordRequestSchema = z.object({
+  current_password: z.string().min(1, "Current password is required"),
+  new_password: z.string().min(8, "New password must be at least 8 characters"),
+  confirm_password: z.string().min(1, "Please confirm your new password"),
+}).refine((data) => data.new_password === data.confirm_password, {
+  message: "Passwords do not match",
+  path: ["confirm_password"],
+});
+export type ChangePasswordRequest = z.infer<typeof ChangePasswordRequestSchema>;
+
+
 export const UserInfoSchema = z.object({
   id: z.string().uuid(),
   username: z.string().nullable().optional(),

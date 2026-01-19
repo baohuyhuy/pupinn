@@ -37,6 +37,13 @@ pub fn create_router(state: AppState) -> Router {
         .route("/login", post(auth::login))
         .route("/me", get(auth::me))
         .route("/users", post(auth::create_user))
+        .route(
+            "/change-password",
+            post(auth::change_password).layer(axum_middleware::from_fn_with_state(
+                state.clone(),
+                middleware::require_auth,
+            )),
+        )
         // Guest registration (public)
         .route("/register", post(guest_auth::register))
         // Guest login (public)
@@ -48,7 +55,16 @@ pub fn create_router(state: AppState) -> Router {
                 state.clone(),
                 middleware::require_guest,
             )),
+        )
+        // Guest change password (requires guest auth)
+        .route(
+            "/guest/change-password",
+            post(guest_auth::change_password).layer(axum_middleware::from_fn_with_state(
+                state.clone(),
+                middleware::require_guest,
+            )),
         );
+
 
     // Public room routes (no auth required)
     let public_room_routes = Router::new()

@@ -10,7 +10,7 @@ use uuid::Uuid;
 use crate::api::{middleware::AuthUser, AppState};
 use crate::errors::AppError;
 use crate::models::{UpdateUser, User, UserRole};
-use crate::services::AuthService;
+use crate::services::{AuthService, CreateUserRequest};
 use crate::utils::{validate_email, validate_username};
 
 /// Employee list query parameters
@@ -153,7 +153,7 @@ pub async fn create_employee(
     let auth_service = AuthService::new(state.pool.clone(), state.jwt_secret.clone());
 
     // Use existing create_user method (single admin constraint enforced in AuthService)
-    let create_request = crate::services::auth_service::CreateUserRequest {
+    let create_request = CreateUserRequest {
         username,
         password: request.password,
         role: request.role,

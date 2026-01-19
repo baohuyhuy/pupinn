@@ -16,6 +16,7 @@ import {
   Brush,
   Package,
   MessageCircle,
+  Settings,
 } from "lucide-react";
 
 import {
@@ -61,9 +62,11 @@ const CLEANER_NAVIGATION = [
       { title: "Dashboard", href: "/staff/cleaner/dashboard", icon: Brush },
       { title: "Inventory", href: "/staff/cleaner/inventory", icon: Package },
       { title: "Chat", href: "/chat", icon: MessageCircle },
+      { title: "Settings", href: "/staff/cleaner/settings", icon: Settings },
     ],
   },
 ];
+
 
 // Navigation for Admin
 const ADMIN_NAVIGATION = [
@@ -79,6 +82,7 @@ const ADMIN_NAVIGATION = [
       { title: "Guests", href: "/staff/admin/guests", icon: UserPlus },
       { title: "Inventory", href: "/staff/admin/inventory", icon: Package },
       { title: "Chat", href: "/chat", icon: MessageCircle },
+      { title: "Settings", href: "/staff/admin/settings", icon: Settings },
     ],
   },
   {
@@ -99,6 +103,7 @@ const RECEPTIONIST_NAVIGATION = [
       { title: "Bookings", href: "/staff/receptionist/bookings", icon: CalendarDays },
       { title: "Rooms", href: "/staff/receptionist/rooms", icon: BedDouble },
       { title: "Chat", href: "/chat", icon: MessageCircle },
+      { title: "Settings", href: "/staff/receptionist/settings", icon: Settings },
     ],
   },
   {
