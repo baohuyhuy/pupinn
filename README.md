@@ -1,4 +1,4 @@
-# Pupinn - Hotel Management System (MVP)
+# 🐶 Pupinn - AI-Powered Hotel Management System
 
 A modern hotel management system built as a student project for an Introduction to Software Engineering (ISE) course. The system covers the core MVP pillars: Guest Check-in/out, Room Status Management, and Basic Bookings.
 
@@ -186,6 +186,38 @@ Guests can self-register at `/register` with email, password, and full name.
 └── .env.example           # Environment variable template
 
 ```
+
+## 🔧 AI Integration
+
+This project implements a modern, event-driven architecture with a focus on AI integration.
+
+### AI & Agent System
+
+The core of the "Smart Hotel" features is powered by the **Rig** framework in Rust.
+
+-   **Agentic Workflow**: The AI is not just a chatbot; it's an agent equipped with **Tools**.
+    -   **SearchRoomsTool**: Allows the AI to query the PostgreSQL database for real-time room availability.
+    -   **CreateBookingProposalTool**: Generates structured booking data for the frontend.
+-   **Structured Communication**: The backend and frontend communicate via a protocol where the AI can send "hidden" structured commands (like `BOOKING_PROPOSAL:{...}`) which the frontend intercepts and renders as interactive UI components - a Booking Card with "Book Now" and "Cancel" buttons.
+
+### Real-time Communication
+
+-   **WebSockets**: The chat system uses `axum::extract::ws` for full-duplex communication.
+-   **State Management**: An in-memory `ChatState` (protected by `Arc<Mutex>`) manages active connections.
+-   **Async Processing**: AI responses are generated asynchronously. The WebSocket handler spawns a tokio task to process the AI reply without blocking the socket, ensuring the UI remains responsive.
+
+### Backend (Rust/Axum)
+
+-   **Layered Design**:
+    -   `api/`: HTTP and WebSocket handlers.
+    -   `services/`: Business logic (AI, Booking, Room management).
+    -   `models/` & `schema/`: Data access layer using Diesel ORM.
+-   **Image Storage**: Direct integration with MinIO (S3-compatible) for handling image uploads securely.
+
+### Frontend (Next.js)
+
+-   **Smart Components**: The `ChatInterface` monitors the message stream for special tags to render dynamic components (like the Booking Card) instead of plain text.
+-   **Optimistic Updates**: The UI updates immediately for a snappy feel, confirming actions in the background.
 
 ## 🐳 Docker Database Management
 
