@@ -387,25 +387,7 @@ Tool returns:
 
 The chat interface detects `BOOKING_PROPOSAL:` and displays an interactive booking card:
 
-```mermaid
-flowchart LR
-    subgraph Card["🏨 Booking Proposal Card"]
-        direction TB
-        Header["Room 101 - Double"]
-        Dates["📅 Feb 20, 2026 → Feb 25, 2026<br/>Nights: 5"]
-        Pricing["💰 1,500,000 VND × 5 nights<br/>Total: 7,500,000 VND"]
-        Actions["[Book Now] [Cancel]"]
-        
-        Header --> Dates
-        Dates --> Pricing
-        Pricing --> Actions
-    end
-    
-    style Header fill:#3b82f6,color:#fff
-    style Dates fill:#f0f9ff
-    style Pricing fill:#f0f9ff
-    style Actions fill:#10b981,color:#fff
-```
+![AI Booking Example - Interactive booking proposal card showing room details, dates, pricing, and action buttons](imgs/ai_booking_example.png)
 
 **11. User Confirms**
 ```
