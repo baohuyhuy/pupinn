@@ -11,6 +11,14 @@ A modern hotel management system built as a student project for an Introduction 
 - **Authentication**: JWT-based with Argon2id password hashing
 - **Infrastructure**: Docker Compose for database and object storage orchestration
 
+### 📚 Technical Documentation
+
+For detailed technical documentation with comprehensive diagrams:
+
+- **[AI Agent System](agent.md)** - Complete documentation of the Rig framework-based AI assistant, including custom tools, architecture diagrams, and booking workflow
+- **[Data Flow Diagrams](data-flow.md)** - Visual representation of data flows across authentication, booking management, AI-assisted booking, real-time chat, room status management, payments, and image uploads
+- **[Database Schema](database-schema.md)** - Comprehensive database design with entity relationship diagrams, constraints, indexes, and migration history
+
 ## 📋 Features
 
 ### Core Functionality

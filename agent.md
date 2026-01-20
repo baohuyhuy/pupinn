@@ -21,62 +21,46 @@ Pupinn features an intelligent AI assistant powered by the **Rig** framework in 
 
 ### AI Service Stack
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    User Chat Interface                       │
-│  (chat-interface.tsx)                                        │
-│  - Sends messages via WebSocket                             │
-│  - Detects BOOKING_PROPOSAL messages                        │
-│  - Renders interactive booking cards                        │
-└────────────────┬────────────────────────────────────────────┘
-                 │
-                 │ WebSocket
-                 │
-┌────────────────▼────────────────────────────────────────────┐
-│              WebSocket Chat Handler                          │
-│  (api/chat.rs)                                              │
-│  - Receives user messages                                   │
-│  - Detects messages to Pupinn bot                           │
-│  - Calls AI service for responses                           │
-└────────────────┬────────────────────────────────────────────┘
-                 │
-                 │ generate_reply()
-                 │
-┌────────────────▼────────────────────────────────────────────┐
-│                    AI Service                                │
-│  (services/ai_service.rs)                                   │
-│                                                              │
-│  ┌──────────────────────────────────────────────────────┐  │
-│  │  Configured AI Agent (Rig Framework)                 │  │
-│  │  - System Preamble (instructions)                    │  │
-│  │  - LLM Client (OpenAI/Gemini)                        │  │
-│  │  - Registered Tools                                  │  │
-│  └──────────────────────────────────────────────────────┘  │
-│                                                              │
-│  ┌──────────────────────────────────────────────────────┐  │
-│  │  Custom Tools                                        │  │
-│  │                                                       │  │
-│  │  1. SearchRoomsTool                                  │  │
-│  │     - Inputs: check_in, check_out, room_type        │  │
-│  │     - Queries database for availability              │  │
-│  │     - Returns formatted room list                    │  │
-│  │                                                       │  │
-│  │  2. CreateBookingProposalTool                        │  │
-│  │     - Inputs: room_id, check_in, check_out          │  │
-│  │     - Validates dates and room                       │  │
-│  │     - Calculates pricing                             │  │
-│  │     - Returns BOOKING_PROPOSAL:{json}                │  │
-│  └──────────────────────────────────────────────────────┘  │
-└────────────────┬────────────────────────────────────────────┘
-                 │
-                 │ Database Queries
-                 │
-┌────────────────▼────────────────────────────────────────────┐
-│               PostgreSQL Database                            │
-│  - rooms table (availability, pricing)                      │
-│  - bookings table (existing reservations)                   │
-│  - system_settings table (AI configuration)                 │
-└──────────────────────────────────────────────────────────────┘
+The following diagram illustrates the complete AI-powered booking system architecture:
+
+```mermaid
+flowchart TB
+    subgraph Frontend["Frontend Layer"]
+        UI["User Chat Interface<br/>(chat-interface.tsx)"]
+        UI_Features["• Sends messages via WebSocket<br/>• Detects BOOKING_PROPOSAL messages<br/>• Renders interactive booking cards"]
+    end
+    
+    subgraph Backend["Backend Layer (Rust/Axum)"]
+        WS["WebSocket Chat Handler<br/>(api/chat.rs)"]
+        WS_Features["• Receives user messages<br/>• Detects messages to Pupinn bot<br/>• Calls AI service for responses"]
+        
+        subgraph AIService["AI Service (services/ai_service.rs)"]
+            Agent["Configured AI Agent<br/>(Rig Framework)"]
+            AgentFeatures["• System Preamble<br/>• LLM Client (OpenAI/Gemini)<br/>• Registered Tools"]
+            
+            subgraph Tools["Custom Tools"]
+                SearchTool["SearchRoomsTool<br/>• Inputs: check_in, check_out, room_type<br/>• Queries database for availability<br/>• Returns formatted room list"]
+                ProposalTool["CreateBookingProposalTool<br/>• Inputs: room_id, check_in, check_out<br/>• Validates dates and room<br/>• Calculates pricing<br/>• Returns BOOKING_PROPOSAL:{json}"]
+            end
+        end
+    end
+    
+    subgraph Data["Data Layer"]
+        DB[("PostgreSQL Database<br/>• rooms table<br/>• bookings table<br/>• system_settings table")]
+    end
+    
+    UI --> |WebSocket| WS
+    WS --> |generate_reply()| Agent
+    Agent --> Tools
+    SearchTool --> DB
+    ProposalTool --> DB
+    
+    style UI fill:#3b82f6
+    style WS fill:#8b5cf6
+    style Agent fill:#8b5cf6
+    style SearchTool fill:#6366f1
+    style ProposalTool fill:#6366f1
+    style DB fill:#10b981
 ```
 
 ---
@@ -401,22 +385,26 @@ Tool returns:
 
 **10. Frontend Renders Card**
 
-The chat interface detects `BOOKING_PROPOSAL:` and displays:
+The chat interface detects `BOOKING_PROPOSAL:` and displays an interactive booking card:
 
-```
-╔════════════════════════════════════════╗
-║      🏨 Booking Proposal               ║
-║                                        ║
-║  Room 101 - Double                    ║
-║  Check-in:  Feb 20, 2026              ║
-║  Check-out: Feb 25, 2026              ║
-║  Nights: 5                             ║
-║                                        ║
-║  Price: 1,500,000 VND × 5 nights      ║
-║  Total: 7,500,000 VND                 ║
-║                                        ║
-║  [ Book Now ]  [ Cancel ]             ║
-╚════════════════════════════════════════╝
+```mermaid
+flowchart LR
+    subgraph Card["🏨 Booking Proposal Card"]
+        direction TB
+        Header["Room 101 - Double"]
+        Dates["📅 Feb 20, 2026 → Feb 25, 2026<br/>Nights: 5"]
+        Pricing["💰 1,500,000 VND × 5 nights<br/>Total: 7,500,000 VND"]
+        Actions["[Book Now] [Cancel]"]
+        
+        Header --> Dates
+        Dates --> Pricing
+        Pricing --> Actions
+    end
+    
+    style Header fill:#3b82f6,color:#fff
+    style Dates fill:#f0f9ff
+    style Pricing fill:#f0f9ff
+    style Actions fill:#10b981,color:#fff
 ```
 
 **11. User Confirms**
