@@ -46,8 +46,10 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error: AxiosError<{ code: string; message: string }>) => {
     if (error.response?.status === 401) {
-      // Clear tokens and redirect to login on unauthorized
-      if (typeof window !== "undefined") {
+      // Check if this error is from a password change request - if so, don't automatically logout
+      const isChangePassword = error.config?.url?.includes("change-password");
+
+      if (!isChangePassword && typeof window !== "undefined") {
         // Clear both staff and guest tokens
         localStorage.removeItem(TOKEN_KEY);
         localStorage.removeItem(USER_KEY);

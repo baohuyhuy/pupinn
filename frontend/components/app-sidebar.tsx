@@ -13,7 +13,10 @@ import {
   Shield,
   PawPrint,
   UserPlus,
-  Brush, // Added Brush icon for Cleaner
+  Brush,
+  Package,
+  MessageCircle,
+  Settings,
 } from "lucide-react";
 
 import {
@@ -39,6 +42,7 @@ const NAVIGATION = [
       { title: "Dashboard", href: "/dashboard", icon: Home },
       { title: "Bookings", href: "/bookings", icon: CalendarDays },
       { title: "Rooms", href: "/rooms", icon: BedDouble },
+      { title: "Chat", href: "/chat", icon: MessageCircle },
     ],
   },
   {
@@ -56,9 +60,13 @@ const CLEANER_NAVIGATION = [
     label: "Overview",
     items: [
       { title: "Dashboard", href: "/staff/cleaner/dashboard", icon: Brush },
+      { title: "Inventory", href: "/staff/cleaner/inventory", icon: Package },
+      { title: "Chat", href: "/chat", icon: MessageCircle },
+      { title: "Settings", href: "/staff/cleaner/settings", icon: Settings },
     ],
   },
 ];
+
 
 // Navigation for Admin
 const ADMIN_NAVIGATION = [
@@ -72,6 +80,9 @@ const ADMIN_NAVIGATION = [
       { title: "Employees", href: "/staff/admin/employees", icon: Users },
       { title: "Financial", href: "/staff/admin/financial", icon: NotebookPen },
       { title: "Guests", href: "/staff/admin/guests", icon: UserPlus },
+      { title: "Inventory", href: "/staff/admin/inventory", icon: Package },
+      { title: "Chat", href: "/chat", icon: MessageCircle },
+      { title: "Settings", href: "/staff/admin/settings", icon: Settings },
     ],
   },
   {
@@ -91,6 +102,8 @@ const RECEPTIONIST_NAVIGATION = [
       { title: "Dashboard", href: "/staff/receptionist/dashboard", icon: Home },
       { title: "Bookings", href: "/staff/receptionist/bookings", icon: CalendarDays },
       { title: "Rooms", href: "/staff/receptionist/rooms", icon: BedDouble },
+      { title: "Chat", href: "/chat", icon: MessageCircle },
+      { title: "Settings", href: "/staff/receptionist/settings", icon: Settings },
     ],
   },
   {

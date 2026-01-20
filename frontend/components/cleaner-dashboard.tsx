@@ -11,27 +11,41 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { type Room, type RoomStatus } from "@/lib/validators";
+import { type Room, type RoomStatus, type Employee } from "@/lib/validators";
 import { getErrorMessage } from "@/lib/api-client";
 import { RoomStatusBadge } from "@/components/room-status-badge";
+import { useAuth } from "@/components/auth-provider";
+import { Badge } from "@/components/ui/badge";
 
 interface CleanerDashboardProps {
   rooms: Room[];
+  cleaners?: Employee[];
   isLoading: boolean;
   error: Error | null;
   onStatusUpdate: (roomId: string, status: RoomStatus) => void;
+  onAssignCleaner?: (roomId: string, cleanerId: string) => void;
   isUpdating: boolean;
 }
 
 export function CleanerDashboard({
   rooms,
+  cleaners,
   isLoading,
   error,
   onStatusUpdate,
+  onAssignCleaner,
   isUpdating,
 }: CleanerDashboardProps) {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [updatingRoomId, setUpdatingRoomId] = useState<string | null>(null);
 
   const getRoomTypeLabel = (type: string) => {
@@ -94,6 +108,27 @@ export function CleanerDashboard({
     }
   };
 
+  const handleAssign = (roomId: string, cleanerId: string) => {
+    if (onAssignCleaner) {
+      setUpdatingRoomId(roomId);
+      try {
+        onAssignCleaner(roomId, cleanerId);
+        toast({
+          title: "Cleaner Assigned",
+          description: "Task has been assigned successfully.",
+        });
+      } catch (err) {
+        toast({
+          title: "Assignment Failed",
+          description: getErrorMessage(err),
+          variant: "destructive",
+        });
+      } finally {
+        setUpdatingRoomId(null);
+      }
+    }
+  };
+
   if (isLoading) {
     return (
       <Card className="bg-slate-800/80 border-slate-700">
@@ -119,14 +154,34 @@ export function CleanerDashboard({
     );
   }
 
-  if (rooms.length === 0) {
+  // Logic for displaying rooms
+  let relevantRooms = rooms;
+  
+  // If user is a cleaner, only show rooms assigned to them AND needing attention
+  if (user?.role === 'cleaner') {
+    relevantRooms = rooms.filter(
+      (room) => (room.status === "dirty" || room.status === "cleaning") && 
+                room.assigned_cleaner_id === user.id
+    );
+  } else {
+    // For admin, show all relevant housekeeping rooms
+    relevantRooms = rooms.filter(
+      (room) => room.status === "dirty" 
+             || room.status === "cleaning"
+             || room.status === "available"
+    );
+  }
+
+  if (relevantRooms.length === 0) {
     return (
       <Card className="bg-slate-800/80 border-slate-700">
         <CardContent className="pt-6">
           <div className="text-center py-12">
             <p className="text-slate-400">No rooms need attention right now.</p>
             <p className="text-slate-500 text-sm mt-2">
-              You&apos;ll see Dirty or Cleaning rooms here when they need work.
+              {user?.role === 'cleaner' 
+                ? "You have no assigned tasks." 
+                : "You'll see Dirty or Cleaning rooms here when they need work."}
             </p>
           </div>
         </CardContent>
@@ -134,17 +189,12 @@ export function CleanerDashboard({
     );
   }
 
-  // Filter to show dirty, cleaning and available rooms
-  const relevantRooms = rooms.filter(
-    (room) => room.status === "dirty" 
-           || room.status === "cleaning"
-           || room.status === "available"
-  );
-
   return (
     <Card className="bg-slate-800/80 border-slate-700">
       <CardHeader>
-        <CardTitle className="text-slate-100">Rooms Needing Attention</CardTitle>
+        <CardTitle className="text-slate-100">
+          {user?.role === 'cleaner' ? "My Tasks" : "Rooms Needing Attention"}
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">
@@ -154,6 +204,9 @@ export function CleanerDashboard({
                 <TableHead className="text-slate-300">Room Number</TableHead>
                 <TableHead className="text-slate-300">Type</TableHead>
                 <TableHead className="text-slate-300">Status</TableHead>
+                {user?.role === 'admin' && (
+                   <TableHead className="text-slate-300">Assigned To</TableHead>
+                )}
                 <TableHead className="text-slate-300">Action</TableHead>
               </TableRow>
             </TableHeader>
@@ -161,6 +214,10 @@ export function CleanerDashboard({
               {relevantRooms.map((room) => {
                 const nextStatus = getNextStatus(room.status);
                 const isUpdatingThisRoom = updatingRoomId === room.id || isUpdating;
+                
+                // Find assigned cleaner name if list is available
+                const assignedCleaner = cleaners?.find(c => c.id === room.assigned_cleaner_id);
+                const cleanerName = assignedCleaner?.full_name || assignedCleaner?.username || "Unassigned";
 
                 return (
                   <TableRow key={room.id} className="border-slate-700">
@@ -173,6 +230,34 @@ export function CleanerDashboard({
                     <TableCell>
                       <RoomStatusBadge status={room.status} />
                     </TableCell>
+                    
+                    {user?.role === 'admin' && (
+                      <TableCell>
+                        {(room.status === 'dirty' || room.status === 'cleaning') ? (
+                          <div className="flex items-center gap-2">
+                            <Select 
+                              value={room.assigned_cleaner_id || undefined} 
+                              onValueChange={(val) => handleAssign(room.id, val)}
+                              disabled={isUpdatingThisRoom}
+                            >
+                              <SelectTrigger className="w-[180px] bg-slate-900 border-slate-700 text-slate-300">
+                                <SelectValue placeholder="Assign Cleaner" />
+                              </SelectTrigger>
+                              <SelectContent className="bg-slate-900 border-slate-700 text-slate-300">
+                                {cleaners?.map((cleaner) => (
+                                  <SelectItem key={cleaner.id} value={cleaner.id}>
+                                    {cleaner.full_name || cleaner.username}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        ) : (
+                          <span className="text-slate-500 text-sm">-</span>
+                        )}
+                      </TableCell>
+                    )}
+
                     <TableCell>
                       {nextStatus ? (
                         <Button

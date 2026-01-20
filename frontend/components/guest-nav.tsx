@@ -14,6 +14,8 @@ import {
   Menu,
   X,
   Hotel,
+  Settings,
+  MessageCircle,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -37,6 +39,16 @@ const navItems = [
     title: "My Bookings",
     href: "/guest/bookings",
     icon: ListOrdered,
+  },
+  {
+    title: "Settings",
+    href: "/guest/settings",
+    icon: Settings,
+  },
+  {
+    title: "Chat",
+    href: "/guest/chat",
+    icon: MessageCircle,
   },
 ];
 

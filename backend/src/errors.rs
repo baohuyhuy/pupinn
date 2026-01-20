@@ -11,6 +11,9 @@ pub enum AppError {
     #[error("Validation error: {0}")]
     ValidationError(String),
 
+    #[error("Bad request: {0}")]
+    BadRequest(String),
+
     #[error("Unauthorized: {0}")]
     Unauthorized(String),
 
@@ -51,6 +54,9 @@ impl IntoResponse for AppError {
         let (status, code, message) = match &self {
             AppError::ValidationError(msg) => {
                 (StatusCode::BAD_REQUEST, "VALIDATION_ERROR", msg.clone())
+            }
+            AppError::BadRequest(msg) => {
+                (StatusCode::BAD_REQUEST, "BAD_REQUEST", msg.clone())
             }
             AppError::Unauthorized(msg) => (StatusCode::UNAUTHORIZED, "UNAUTHORIZED", msg.clone()),
             AppError::Forbidden(msg) => (StatusCode::FORBIDDEN, "FORBIDDEN", msg.clone()),
@@ -134,6 +140,12 @@ impl From<jsonwebtoken::errors::Error> for AppError {
 impl From<argon2::password_hash::Error> for AppError {
     fn from(err: argon2::password_hash::Error) -> Self {
         AppError::InternalError(format!("Password hashing error: {}", err))
+    }
+}
+
+impl From<diesel::r2d2::Error> for AppError {
+    fn from(err: diesel::r2d2::Error) -> Self {
+        AppError::DatabaseError(format!("Connection pool error: {}", err))
     }
 }
 

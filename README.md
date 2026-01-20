@@ -1,4 +1,4 @@
-# Pupinn - Hotel Management System (MVP)
+# 🐶 Pupinn - AI-Powered Hotel Management System
 
 A modern hotel management system built as a student project for an Introduction to Software Engineering (ISE) course. The system covers the core MVP pillars: Guest Check-in/out, Room Status Management, and Basic Bookings.
 
@@ -7,8 +7,17 @@ A modern hotel management system built as a student project for an Introduction 
 - **Backend**: Rust with Axum web framework
 - **Frontend**: Next.js 15 with React 19 and shadcn/ui
 - **Database**: PostgreSQL 16 (Dockerized) with Diesel ORM
+- **Object Storage**: MinIO for image storage
 - **Authentication**: JWT-based with Argon2id password hashing
-- **Infrastructure**: Docker Compose for database orchestration
+- **Infrastructure**: Docker Compose for database and object storage orchestration
+
+### 📚 Technical Documentation
+
+For detailed technical documentation with comprehensive diagrams:
+
+- **[AI Agent System](agent.md)** - Complete documentation of the Rig framework-based AI assistant, including custom tools, architecture diagrams, and booking workflow
+- **[Data Flow Diagrams](data-flow.md)** - Visual representation of data flows across authentication, booking management, AI-assisted booking, real-time chat, room status management, payments, and image uploads
+- **[Database Schema](database-schema.md)** - Comprehensive database design with entity relationship diagrams, constraints, indexes, and migration history
 
 ## 📋 Features
 
@@ -18,14 +27,19 @@ A modern hotel management system built as a student project for an Introduction 
 - **Room Management**: Add rooms, update status (Available/Occupied/Maintenance/Dirty/Cleaning)
 - **Guest Check-in/Check-out**: Full guest lifecycle management (checkout now marks rooms Dirty)
 - **Dashboard**: Today's arrivals, departures, and room availability stats
-- **Cleaner Dashboard**: Visual status indicators (red/yellow/green) and cleaning workflow (Dirty → Cleaning → Available)
+- **Cleaner Dashboard**: Visual status indicators (red/yellow/green), cleaning workflow (Dirty → Cleaning → Available), and **Task Assignments**
+- **Chat System**: Real-time communication between guests and staff
+- **Financial Reports**: Beautiful and detailed financial performance reports
+- **Inventory Management**: Track and manage hotel supplies and inventory
+- **User Settings**: Change password and manage profile in the settings page
 
 ### User Roles
 
 - **Guest**: Self-register, login, search rooms, book rooms, view/cancel own bookings
 - **Receptionist**: Book rooms, check-in/out guests, view all bookings
-- **Admin**: All receptionist permissions + room management
-- **Cleaner**: Access cleaner dashboard to view Dirty/Cleaning/Available rooms, update statuses, and cannot set rooms to Occupied/Maintenance
+- **Admin**: All receptionist permissions + room management + inventory management + user management + financial reports. 
+- **Cleaner**: Access cleaner dashboard to view Dirty/Cleaning/Available rooms, update statuses, and cannot set rooms to Occupied/Maintenance. view/Report missing inventory items.
+- **Chat**: Real-time communication between guests and staff
 
 ### Guest Self-Service Portal
 
@@ -33,6 +47,8 @@ A modern hotel management system built as a student project for an Introduction 
 - **Room Search**: Search available rooms by date range and room type
 - **Self-Booking**: Book rooms directly without staff assistance
 - **Booking Management**: View own bookings and cancel upcoming reservations
+- **Chat**: Real-time communication between guests and staff
+- **User Settings**: Change password and manage profile in the settings page
 
 ## 🚀 Quick Start
 
@@ -43,27 +59,30 @@ A modern hotel management system built as a student project for an Introduction 
 - **Node.js** 20+ with pnpm
 - **Diesel CLI** (`cargo install diesel_cli --no-default-features --features postgres`)
 
-### 1. Database Setup (Dockerized)
+### 1. Infrastructure Setup
 
-The project uses a Dockerized PostgreSQL 16 database with automatic migrations and optional seed data.
+The project uses Docker for PostgreSQL 16 and MinIO object storage.
 
 ```bash
-# Step 1: Create environment file and edit your own customize database settings
-mv .env.example .env
-# Step 1.1: Edit .env to customize database settings
+# Step 1: Create environment file
+cp .env.example .env
+# Step 1.1: Edit .env to customize settings if needed
 
-# Step 2: Start database container
-docker compose up -d postgres
+# Step 2: Start infrastructure containers
+docker compose up -d postgres minio minio-create-bucket
 
-# Step 3: Wait for container to be healthy (10-15 seconds)
+# Step 3: Wait for containers to be healthy
 docker compose ps
 ```
 
-**What gets created:**
+**What happens automatically:**
 
 - ✅ PostgreSQL 16 container with persistent data
-- ✅ Database with all tables (users, rooms, bookings)
+- ✅ Database migrations run automatically (`01-run-migrations.sh`)
+- ✅ Sample data seeded automatically (`02-seed-data.sh`) - includes 3 users, 13 rooms, 5 bookings
 - ✅ Health checks for container readiness
+
+> **Note**: Migrations and seeding only run on **first initialization** (when the database is empty). If you need to reset, use `docker compose down -v` to remove volumes, then start again.
 
 **Default Configuration:**
 
@@ -71,28 +90,6 @@ docker compose ps
 - **User**: `pupinn_user`
 - **Port**: `5432` (customizable if port conflict)
 - **Connection String**: `postgresql://pupinn_user:dev_password_123@localhost:5432/pupinn_db`
-
-### Seed Sample Data (Optional)
-
-Creates full demo dataset:
-
-- 3 users (admin, reception, guest@example.com)
-- 13 rooms (full hotel layout)
-- 5 sample bookings
-
-**Bash/Linux/Mac:**
-
-```bash
-# From project root
-./scripts/init-db/seed-data.sh
-```
-
-**PowerShell/Windows (Easiest - Recommended):**
-
-```powershell
-# From project root - Run the helper script
-.\scripts\init-db\seed-data.ps1
-```
 
 ### 2. Backend Setup
 
@@ -106,16 +103,11 @@ ALLOWED_ORIGIN=http://localhost:3000
 SERVER_HOST=0.0.0.0
 SERVER_PORT=8080
 
-# Run migrations
-diesel migration run
-
-# Start server
+# Start server (migrations already handled by Docker init scripts)
 cargo run --bin server
 ```
 
 The server will start on `http://localhost:8080`.
-
-> **Note**: If you haven't seeded sample data yet, see the "Optional: Seed Sample Data" section above.
 
 ### 3. Frontend Setup
 
@@ -126,13 +118,22 @@ cd frontend
 pnpm install
 
 # Create .env.local
-echo "NEXT_PUBLIC_API_URL=http://localhost:8080" > .env.local
+echo "NEXT_PUBLIC_API_URL=http://localhost:8080/api" > .env.local
 
 # Start development server
 pnpm dev
 ```
 
-### 4. Access the Application
+### 4. Full Docker Setup (Alternative)
+
+For a complete setup including backend, frontend, and infrastructure, you can run:
+
+```bash
+# Run everything from the root directory
+docker compose up --build
+```
+
+### 5. Access the Application
 
 Open http://localhost:3000 in your browser.
 
@@ -181,9 +182,9 @@ Guests can self-register at `/register` with email, password, and full name.
 │   └── hooks/             # Custom React hooks
 │
 ├── scripts/
-│   └── init-db/           # Database initialization scripts
-│       ├── 01-run-migrations.sh    # Diesel migration runner
-│       ├── 02-seed-data.sh         # Optional seed data loader
+│   └── init-db/           # Database initialization scripts (auto-run on first DB init)
+│       ├── 01-run-migrations.sh    # Automatic migration runner
+│       ├── 02-seed-data.sh         # Automatic seed data loader
 │       └── seeds/         # SQL seed files
 │           ├── 01-seed-users.sql   # Sample users
 │           ├── 02-seed-rooms.sql   # Sample rooms
@@ -193,6 +194,38 @@ Guests can self-register at `/register` with email, password, and full name.
 └── .env.example           # Environment variable template
 
 ```
+
+## 🔧 AI Integration
+
+This project implements a modern, event-driven architecture with a focus on AI integration.
+
+### AI & Agent System
+
+The core of the "Smart Hotel" features is powered by the **Rig** framework in Rust.
+
+-   **Agentic Workflow**: The AI is not just a chatbot; it's an agent equipped with **Tools**.
+    -   **SearchRoomsTool**: Allows the AI to query the PostgreSQL database for real-time room availability.
+    -   **CreateBookingProposalTool**: Generates structured booking data for the frontend.
+-   **Structured Communication**: The backend and frontend communicate via a protocol where the AI can send "hidden" structured commands (like `BOOKING_PROPOSAL:{...}`) which the frontend intercepts and renders as interactive UI components - a Booking Card with "Book Now" and "Cancel" buttons.
+
+### Real-time Communication
+
+-   **WebSockets**: The chat system uses `axum::extract::ws` for full-duplex communication.
+-   **State Management**: An in-memory `ChatState` (protected by `Arc<Mutex>`) manages active connections.
+-   **Async Processing**: AI responses are generated asynchronously. The WebSocket handler spawns a tokio task to process the AI reply without blocking the socket, ensuring the UI remains responsive.
+
+### Backend (Rust/Axum)
+
+-   **Layered Design**:
+    -   `api/`: HTTP and WebSocket handlers.
+    -   `services/`: Business logic (AI, Booking, Room management).
+    -   `models/` & `schema/`: Data access layer using Diesel ORM.
+-   **Image Storage**: Direct integration with MinIO (S3-compatible) for handling image uploads securely.
+
+### Frontend (Next.js)
+
+-   **Smart Components**: The `ChatInterface` monitors the message stream for special tags to render dynamic components (like the Booking Card) instead of plain text.
+-   **Optimistic Updates**: The UI updates immediately for a snappy feel, confirming actions in the background.
 
 ## 🐳 Docker Database Management
 
@@ -249,7 +282,7 @@ docker compose restart postgres
 ```bash
 docker compose down -v
 docker compose up -d postgres
-cd backend && diesel migration run
+# Migrations and seeding will run automatically on fresh initialization
 ```
 
 ## 🧪 Testing

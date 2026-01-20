@@ -190,6 +190,7 @@ pub async fn cancel(
 }
 
 /// Sync booking statuses response
+#[allow(dead_code)]
 #[derive(Debug, Serialize)]
 pub struct SyncBookingStatusesResponse {
     pub message: String,
@@ -200,6 +201,7 @@ pub struct SyncBookingStatusesResponse {
 /// 
 /// Updates stale bookings:
 /// - 'CheckedIn' bookings with check_out_date before today → 'Overstay'
+#[allow(dead_code)]
 pub async fn sync_booking_statuses(
     State(state): State<AppState>,
 ) -> Result<impl IntoResponse, AppError> {

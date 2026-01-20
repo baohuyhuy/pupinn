@@ -57,7 +57,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <p className="text-slate-400">Shift in progress</p>
           </div>
         </header>
-        <main className="flex-1 px-4 py-6 sm:px-6 lg:px-10">{children}</main>
+        <main className="flex-1">{children}</main>
       </div>
     </SidebarProvider>
   );

@@ -5,8 +5,7 @@ use crate::api::middleware::AuthUser;
 use crate::api::AppState;
 use crate::errors::AppError;
 use crate::models::{UserInfo, UserRole};
-use crate::services::auth_service::{CreateUserRequest, LoginRequest};
-use crate::services::AuthService;
+use crate::services::{AuthService, ChangePasswordRequest, CreateUserRequest, LoginRequest};
 
 /// Login request DTO
 #[derive(Debug, Deserialize)]
@@ -70,4 +69,17 @@ pub async fn create_user(
     let user_info = auth_service.create_user(&request)?;
 
     Ok((StatusCode::CREATED, Json(user_info)))
+}
+
+/// Change password handler (requires auth)
+pub async fn change_password(
+    State(state): State<AppState>,
+    Extension(auth_user): Extension<AuthUser>,
+    Json(payload): Json<ChangePasswordRequest>,
+) -> Result<impl IntoResponse, AppError> {
+    let auth_service = AuthService::new(state.pool, state.jwt_secret);
+
+    auth_service.change_password(auth_user.user_id, &payload)?;
+
+    Ok(StatusCode::OK)
 }

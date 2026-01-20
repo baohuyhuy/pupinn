@@ -117,7 +117,7 @@ export default function AdminDashboardPage() {
 
   return (
     <RouteGuard requiredRole="admin">
-      <div className="space-y-8">
+      <div className="space-y-8 px-8 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-slate-100">
             Admin Dashboard

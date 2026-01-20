@@ -44,7 +44,7 @@ impl DatabaseErrorInformation for StringError {
 use crate::db::DbPool;
 use crate::errors::{AppError, AppResult};
 use crate::models::{
-    Booking, BookingStatus, BookingWithRoom, NewBooking, Room, RoomStatus, RoomType, UpdateBooking,
+    Booking, BookingStatus, BookingWithRoom, BookingWithPayments, NewBooking, Room, RoomStatus, RoomType, UpdateBooking,
 };
 use crate::schema::{bookings, rooms};
 
@@ -70,6 +70,7 @@ impl BookingService {
     }
 
     /// Get default price for a room type
+    #[allow(dead_code)]
     fn get_default_price_for_room_type(room_type: RoomType) -> BigDecimal {
         match room_type {
             // Default prices in VND
@@ -324,6 +325,22 @@ impl BookingService {
         Ok(BookingWithRoom { booking, room })
     }
 
+    /// Get a booking with room and payment summary
+    #[allow(dead_code)]
+    pub fn get_booking_with_payments(&self, booking_id: Uuid) -> AppResult<BookingWithPayments> {
+        let booking_with_room = self.get_booking_with_room(booking_id)?;
+        
+        // Get payment summary
+        let payment_service = crate::services::PaymentService::new(self.pool.clone());
+        let payment_summary = payment_service.get_payment_summary(booking_id).ok();
+        
+        Ok(BookingWithPayments {
+            booking: booking_with_room.booking,
+            room: booking_with_room.room,
+            payment_summary,
+        })
+    }
+
     /// List bookings with optional filters
     pub fn list_bookings(
         &self,
@@ -378,6 +395,7 @@ impl BookingService {
         Ok(result)
     }
 
+    #[allow(dead_code)]
     pub fn get_guest_bookings(
         &self,
         guest_name_input: &str,
@@ -835,11 +853,23 @@ impl BookingService {
     }
 
     /// Calculate financial metrics for a room
+    #[allow(dead_code)]
     pub fn calculate_room_financials(
         &self,
         room_id: Uuid,
         start_date: Option<NaiveDate>,
         end_date: Option<NaiveDate>,
+    ) -> AppResult<RoomFinancials> {
+        self.calculate_room_financials_with_payments(room_id, start_date, end_date, false)
+    }
+
+    /// Calculate financial metrics for a room, optionally using actual payments
+    pub fn calculate_room_financials_with_payments(
+        &self,
+        room_id: Uuid,
+        start_date: Option<NaiveDate>,
+        end_date: Option<NaiveDate>,
+        _use_payments: bool,
     ) -> AppResult<RoomFinancials> {
         let mut conn = self
             .pool
@@ -921,6 +951,102 @@ impl BookingService {
             average_revenue,
             occupancy_rate: occupancy_rate.min(100.0).max(0.0),
         })
+    }
+
+    /// Get time-series revenue data grouped by date
+    pub fn get_revenue_time_series(
+        &self,
+        room_id: Option<Uuid>,
+        start_date: Option<NaiveDate>,
+        end_date: Option<NaiveDate>,
+    ) -> AppResult<Vec<(NaiveDate, BigDecimal)>> {
+        let mut conn = self
+            .pool
+            .get()
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        let mut query = bookings::table
+            .into_boxed()
+            .filter(bookings::status.eq(BookingStatus::CheckedOut));
+
+        if let Some(room_id) = room_id {
+            query = query.filter(bookings::room_id.eq(room_id));
+        }
+
+        if let Some(start) = start_date {
+            query = query.filter(bookings::check_out_date.ge(start));
+        }
+
+        if let Some(end) = end_date {
+            query = query.filter(bookings::check_out_date.le(end));
+        }
+
+        let bookings_list: Vec<Booking> = query
+            .order(bookings::check_out_date.asc())
+            .load(&mut conn)
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        // Group by date and sum revenue
+        use std::collections::HashMap;
+        let mut revenue_by_date: HashMap<NaiveDate, BigDecimal> = HashMap::new();
+
+        for booking in bookings_list {
+            let date = booking.check_out_date;
+            let revenue = revenue_by_date.entry(date).or_insert_with(|| BigDecimal::from(0));
+            *revenue += &booking.price;
+        }
+
+        let mut result: Vec<(NaiveDate, BigDecimal)> = revenue_by_date.into_iter().collect();
+        result.sort_by_key(|(date, _)| *date);
+
+        Ok(result)
+    }
+
+    /// Get booking history for a specific room
+    pub fn get_room_booking_history(
+        &self,
+        room_id: Uuid,
+        start_date: Option<NaiveDate>,
+        end_date: Option<NaiveDate>,
+    ) -> AppResult<Vec<BookingWithRoom>> {
+        let mut conn = self
+            .pool
+            .get()
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        let mut query = bookings::table
+            .into_boxed()
+            .filter(bookings::room_id.eq(room_id))
+            .filter(bookings::status.eq(BookingStatus::CheckedOut));
+
+        if let Some(start) = start_date {
+            query = query.filter(bookings::check_out_date.ge(start));
+        }
+
+        if let Some(end) = end_date {
+            query = query.filter(bookings::check_out_date.le(end));
+        }
+
+        let booking_list: Vec<Booking> = query
+            .order(bookings::check_out_date.desc())
+            .load(&mut conn)
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        let room: Option<Room> = rooms::table
+            .find(room_id)
+            .first(&mut conn)
+            .optional()
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        let result: Vec<BookingWithRoom> = booking_list
+            .into_iter()
+            .map(|booking| BookingWithRoom {
+                booking,
+                room: room.clone(),
+            })
+            .collect();
+
+        Ok(result)
     }
 
     /// Handle stale bookings

@@ -23,8 +23,10 @@ import {
   BookingFilters,
   type BookingFiltersState,
 } from "@/components/booking-filters";
+import { CheckInPaymentDialog } from "@/components/check-in-payment-dialog";
 import { apiClient, getErrorMessage } from "@/lib/api-client";
 import { toast } from "@/hooks/use-toast";
+import type { CreatePaymentRequest } from "@/lib/validators";
 
 const defaultFilters: BookingFiltersState = {
   status: "all",
@@ -103,27 +105,29 @@ export default function AdminBookingsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bookings"] });
       queryClient.invalidateQueries({ queryKey: ["rooms"] });
+      queryClient.invalidateQueries({ queryKey: ["payments"] });
+      queryClient.invalidateQueries({ queryKey: ["payment-summary"] });
+      // Invalidate financial queries to update financial report
+      queryClient.invalidateQueries({ predicate: (query) => 
+        query.queryKey[0] === "financial" 
+      });
       // Invalidate all availableRooms queries for synchronization
       queryClient.invalidateQueries({ predicate: (query) => 
         query.queryKey[0] === "availableRooms" 
       });
       toast({
         title: "Check-in Successful",
-        description: "Guest has been checked in.",
+        description: "Guest has been checked in and payment recorded.",
       });
       setCheckInDialog({ open: false, bookingId: null, isEarly: false });
     },
     onError: (error: Error) => {
       const message = getErrorMessage(error);
-      if (message.includes("Check-in date is")) {
-        setCheckInDialog((prev) => ({ ...prev, isEarly: true }));
-      } else {
-        toast({
-          title: "Check-in Failed",
-          description: message,
-          variant: "destructive",
-        });
-      }
+      toast({
+        title: "Check-in Failed",
+        description: message,
+        variant: "destructive",
+      });
     },
   });
 
@@ -194,7 +198,17 @@ export default function AdminBookingsPage() {
   });
 
   const handleCheckIn = (bookingId: string) => {
-    setCheckInDialog({ open: true, bookingId, isEarly: false });
+    // Check if this is an early check-in by comparing check-in date with today
+    const booking = bookings?.find((b) => b.id === bookingId);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const checkInDate = booking ? new Date(booking.check_in_date) : null;
+    if (checkInDate) {
+      checkInDate.setHours(0, 0, 0, 0);
+    }
+    const isEarly = checkInDate && checkInDate > today;
+    
+    setCheckInDialog({ open: true, bookingId, isEarly: isEarly || false });
   };
 
   const handleCheckOut = (bookingId: string) => {
@@ -205,13 +219,14 @@ export default function AdminBookingsPage() {
     setCancelDialog({ open: true, bookingId });
   };
 
-  const confirmCheckIn = (confirmEarly: boolean = false) => {
-    if (checkInDialog.bookingId) {
-      checkInMutation.mutate({
-        bookingId: checkInDialog.bookingId,
-        confirmEarly,
-      });
-    }
+  const handleCheckInConfirm = async (paymentData: CreatePaymentRequest) => {
+    if (!checkInDialog.bookingId) return;
+    
+    // Payment is already created in the dialog, just proceed with check-in
+    checkInMutation.mutate({
+      bookingId: checkInDialog.bookingId,
+      confirmEarly: checkInDialog.isEarly,
+    });
   };
 
   const confirmCheckOut = () => {
@@ -272,51 +287,15 @@ export default function AdminBookingsPage() {
         />
       </div>
 
-      <Dialog
+      <CheckInPaymentDialog
         open={checkInDialog.open}
+        bookingId={checkInDialog.bookingId}
+        isEarly={checkInDialog.isEarly}
         onOpenChange={(open) =>
           setCheckInDialog({ open, bookingId: null, isEarly: false })
         }
-      >
-        <DialogContent className="bg-slate-900 border-slate-700">
-          <DialogHeader>
-            <DialogTitle className="text-slate-100">
-              {checkInDialog.isEarly ? "Early Check-in" : "Confirm Check-in"}
-            </DialogTitle>
-            <DialogDescription className="text-slate-400">
-              {checkInDialog.isEarly
-                ? "The check-in date for this booking is in the future. Do you want to proceed with early check-in?"
-                : "Are you sure you want to check in this guest? The room status will be updated to occupied."}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() =>
-                setCheckInDialog({
-                  open: false,
-                  bookingId: null,
-                  isEarly: false,
-                })
-              }
-              className="border-slate-600 text-slate-300 hover:bg-slate-800"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={() => confirmCheckIn(checkInDialog.isEarly)}
-              disabled={checkInMutation.isPending}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white"
-            >
-              {checkInMutation.isPending
-                ? "Processing..."
-                : checkInDialog.isEarly
-                  ? "Confirm Early Check-in"
-                  : "Check In"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        onConfirm={handleCheckInConfirm}
+      />
 
       <Dialog
         open={checkOutDialog.open}

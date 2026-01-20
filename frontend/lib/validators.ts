@@ -30,6 +30,17 @@ export const LoginResponseSchema = z.object({
 });
 export type LoginResponse = z.infer<typeof LoginResponseSchema>;
 
+export const ChangePasswordRequestSchema = z.object({
+  current_password: z.string().min(1, "Current password is required"),
+  new_password: z.string().min(8, "New password must be at least 8 characters"),
+  confirm_password: z.string().min(1, "Please confirm your new password"),
+}).refine((data) => data.new_password === data.confirm_password, {
+  message: "Passwords do not match",
+  path: ["confirm_password"],
+});
+export type ChangePasswordRequest = z.infer<typeof ChangePasswordRequestSchema>;
+
+
 export const UserInfoSchema = z.object({
   id: z.string().uuid(),
   username: z.string().nullable().optional(),
@@ -84,6 +95,7 @@ export const RoomSchema = z.object({
   price: z.union([z.string(), z.number()]).optional(),
   created_at: z.string().datetime(),
   updated_at: z.string().datetime(),
+  assigned_cleaner_id: z.string().uuid().nullable().optional(),
 });
 export type Room = z.infer<typeof RoomSchema>;
 
@@ -322,6 +334,7 @@ export const CompareRoomsRequestSchema = z.object({
   room_ids: z.array(z.string().uuid()),
   start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
   end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  use_payments: z.boolean().optional(),
 });
 export type CompareRoomsRequest = z.infer<typeof CompareRoomsRequestSchema>;
 
@@ -375,3 +388,88 @@ export const AddGuestNoteRequestSchema = z.object({
 });
 export type AddGuestNoteRequest = z.infer<typeof AddGuestNoteRequestSchema>;
 
+// === Payment Schemas ===
+export const PaymentType = z.enum(["deposit", "partial", "full", "refund"]);
+export type PaymentType = z.infer<typeof PaymentType>;
+
+export const PaymentMethod = z.enum(["cash", "card", "bank_transfer", "other"]);
+export type PaymentMethod = z.infer<typeof PaymentMethod>;
+
+export const PaymentSchema = z.object({
+  id: z.string().uuid(),
+  booking_id: z.string().uuid(),
+  amount: z.string(), // Decimal as string
+  payment_type: PaymentType,
+  payment_method: z.string(),
+  notes: z.string().nullable().optional(),
+  created_by_user_id: z.string().uuid(),
+  created_at: z.string().datetime(),
+  updated_at: z.string().datetime(),
+});
+export type Payment = z.infer<typeof PaymentSchema>;
+
+export const PaymentSummarySchema = z.object({
+  booking_id: z.string().uuid(),
+  total_price: z.string(), // Decimal as string
+  total_paid: z.string(), // Decimal as string
+  remaining_balance: z.string(), // Decimal as string
+  payment_count: z.number(),
+});
+export type PaymentSummary = z.infer<typeof PaymentSummarySchema>;
+
+export const CreatePaymentRequestSchema = z.object({
+  amount: z.string().refine(
+    (val) => {
+      const num = parseFloat(val);
+      return !isNaN(num) && num !== 0;
+    },
+    { message: "Amount must be a non-zero number" }
+  ),
+  payment_type: PaymentType,
+  payment_method: z.string().min(1, "Payment method is required"),
+  notes: z.string().optional().nullable(),
+});
+export type CreatePaymentRequest = z.infer<typeof CreatePaymentRequestSchema>;
+
+export const UpdatePaymentRequestSchema = z.object({
+  amount: z.string().optional(),
+  payment_type: PaymentType.optional(),
+  payment_method: z.string().optional(),
+  notes: z.string().optional().nullable(),
+});
+export type UpdatePaymentRequest = z.infer<typeof UpdatePaymentRequestSchema>;
+
+
+export const InventoryStatus = z.enum([
+  "normal",
+  "low_stock",
+  "broken",
+  "lost",
+  "need_replacement",
+]);
+export type InventoryStatus = z.infer<typeof InventoryStatus>;
+
+export const InventoryItem = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1, "Name is required"),
+  description: z.string().nullable().optional(),
+  quantity: z.number().int().min(0, "Quantity must be 0 or greater"),
+  price: z.string().optional(), // Optional because Cleaners won't see it
+  status: InventoryStatus,
+  notes: z.string().nullable().optional(),
+  updated_at: z.string(),
+});
+export type InventoryItem = z.infer<typeof InventoryItem>;
+
+export const CreateInventoryItem = InventoryItem.pick({
+  name: true,
+  description: true,
+  quantity: true,
+  status: true,
+  notes: true,
+}).extend({
+  price: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid price format"),
+});
+export type CreateInventoryItem = z.infer<typeof CreateInventoryItem>;
+
+export const UpdateInventoryItem = CreateInventoryItem.partial();

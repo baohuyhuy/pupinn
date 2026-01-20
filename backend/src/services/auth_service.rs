@@ -12,8 +12,7 @@ use crate::db::DbPool;
 use crate::errors::{AppError, AppResult};
 use crate::models::{GuestInfo, NewGuestUser, NewUser, UpdateUser, User, UserInfo, UserRole};
 // We import the users module, but NOT dsl::* to avoid variable name conflicts
-use crate::schema::users; 
-use crate::schema::users::dsl::*;
+use crate::schema::users;
 
 /// JWT claims structure
 #[derive(Debug, Serialize, Deserialize)]
@@ -67,6 +66,14 @@ pub struct GuestLoginRequest {
     pub email: String,
     pub password: String,
 }
+
+/// Change password request payload
+#[derive(Debug, Deserialize)]
+pub struct ChangePasswordRequest {
+    pub current_password: String,
+    pub new_password: String,
+}
+
 
 /// Authentication service for user management and JWT operations
 pub struct AuthService {
@@ -143,30 +150,50 @@ impl AuthService {
 
         // Trim username to handle any whitespace issues
         let username_input = request.username.trim();
+        tracing::debug!("Login attempt for username: '{}'", username_input);
 
         // First, try to find the user
         let user_opt: Option<User> = users::table
             .filter(users::username.eq(&username_input))
             .first(&mut conn)
             .optional()
-            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+            .map_err(|e| {
+                tracing::debug!("Database error during user lookup: {}", e);
+                AppError::DatabaseError(e.to_string())
+            })?;
 
         let user = match user_opt {
-            Some(u) => u,
+            Some(u) => {
+                tracing::debug!("User found: id={}, role={:?}, deactivated={:?}", 
+                    u.id, u.role, u.deactivated_at.is_some());
+                u
+            },
             None => {
+                tracing::debug!("Login failed: user '{}' not found", username_input);
                 return Err(AppError::Unauthorized("Invalid credentials".to_string()));
             }
         };
 
         // Check if user is deactivated
         if user.deactivated_at.is_some() {
+            tracing::debug!("Login failed: user '{}' is deactivated", username_input);
             return Err(AppError::Unauthorized("Account is deactivated".to_string()));
         }
 
         // Verify password
-        if !Self::verify_password(&request.password, &user.password_hash)? {
+        tracing::debug!("Verifying password for user '{}'", username_input);
+        let password_valid = Self::verify_password(&request.password, &user.password_hash)
+            .map_err(|e| {
+                tracing::debug!("Password verification error: {}", e);
+                e
+            })?;
+        
+        if !password_valid {
+            tracing::debug!("Login failed: invalid password for user '{}'", username_input);
             return Err(AppError::Unauthorized("Invalid credentials".to_string()));
         }
+        
+        tracing::debug!("Login successful for user '{}' (role: {:?})", username_input, user.role);
 
         let token = self.generate_token(&user)?;
 
@@ -798,7 +825,60 @@ impl AuthService {
 
         Ok(())
     }
+
+    /// Change password for any user (staff or guest)
+    pub fn change_password(&self, user_id: Uuid, request: &ChangePasswordRequest) -> AppResult<()> {
+        let mut conn = self
+            .pool
+            .get()
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        // Get the user
+        let user: User = users::table
+            .find(user_id)
+            .first(&mut conn)
+            .map_err(|_| AppError::NotFound("User not found".to_string()))?;
+
+        // Check if user is deactivated
+        if user.deactivated_at.is_some() {
+            return Err(AppError::ValidationError(
+                "Cannot change password for deactivated account".to_string(),
+            ));
+        }
+
+        // Verify current password
+        if !Self::verify_password(&request.current_password, &user.password_hash)? {
+            return Err(AppError::Unauthorized(
+                "Current password is incorrect".to_string(),
+            ));
+        }
+
+        // Validate new password based on user role
+        if user.role == UserRole::Guest {
+            // Guests have stricter password requirements
+            Self::validate_guest_password(&request.new_password)?;
+        } else {
+            // Staff users need at least 8 characters
+            if request.new_password.len() < 8 {
+                return Err(AppError::ValidationError(
+                    "Password must be at least 8 characters".to_string(),
+                ));
+            }
+        }
+
+        // Hash new password
+        let hashed_password = Self::hash_password(&request.new_password)?;
+
+        // Update password
+        diesel::update(users::table.find(user_id))
+            .set(users::password_hash.eq(&hashed_password))
+            .execute(&mut conn)
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        Ok(())
+    }
 }
+
 
 #[cfg(test)]
 mod tests {
@@ -818,5 +898,29 @@ mod tests {
         let password = "test_password_123";
         let hash = AuthService::hash_password(password).unwrap();
         assert!(hash.starts_with("$argon2"));
+    }
+
+    #[test]
+    fn test_seed_data_password_hashes() {
+        // Test password hashes from seed data (01-seed-users.sql)
+        // Admin user: username="admin", password="admin123"
+        let admin_hash = "$argon2id$v=19$m=19456,t=2,p=1$Q7qpjUxx/KIS14QRgxPttw$ZIljgEut2REPXKiphJsLmDMneXDCxizpxoH0bJxiBl8";
+        assert!(AuthService::verify_password("admin123", admin_hash).unwrap(), 
+            "Admin password hash verification failed");
+
+        // Receptionist user: username="reception", password="reception123"
+        let reception_hash = "$argon2id$v=19$m=19456,t=2,p=1$5KAhOzRSIvwMzQ4ZXJBWsg$tnEd4b8tbwXcgyaetI9bRyDwXKqO+7mewkEKTFeTpFU";
+        assert!(AuthService::verify_password("reception123", reception_hash).unwrap(),
+            "Receptionist password hash verification failed");
+
+        // Cleaner user: username="cleaner", password="cleaner123"
+        let cleaner_hash = "$argon2id$v=19$m=19456,t=2,p=1$c6G23yKLofMCXxhATDfKFg$0FpBivdfAV1E8dh9M9JEofdPhehdEwOpr1x0gqY+3Yk";
+        assert!(AuthService::verify_password("cleaner123", cleaner_hash).unwrap(),
+            "Cleaner password hash verification failed");
+
+        // Guest user: email="guest@example.com", password="guest123"
+        let guest_hash = "$argon2id$v=19$m=19456,t=2,p=1$8iHuB7fiS94sUBRjkTJahA$+TImWRzVe4flgmWQxgZ0TwDB9u7XOH4P6p1Wx5XSCbc";
+        assert!(AuthService::verify_password("guest123", guest_hash).unwrap(),
+            "Guest password hash verification failed");
     }
 }

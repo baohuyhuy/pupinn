@@ -118,3 +118,14 @@ export function isReceptionist(): boolean {
   return user?.role === 'receptionist';
 }
 
+/**
+ * Change current user password
+ */
+export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  const { apiClient } = await import("./api-client");
+  await apiClient.post("/auth/change-password", {
+    current_password: currentPassword,
+    new_password: newPassword,
+  });
+}
+

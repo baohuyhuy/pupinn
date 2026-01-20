@@ -161,3 +161,17 @@ export async function getCurrentGuest(): Promise<GuestUser> {
   return response.data;
 }
 
+/**
+ * Change current guest password
+ * 
+ * @param currentPassword - The current password
+ * @param newPassword - The new password
+ */
+export async function changePasswordGuest(currentPassword: string, newPassword: string): Promise<void> {
+  await apiClient.post("/auth/guest/change-password", {
+    current_password: currentPassword,
+    new_password: newPassword,
+  });
+}
+
+

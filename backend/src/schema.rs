@@ -16,6 +16,14 @@ pub mod sql_types {
     #[derive(diesel::query_builder::QueryId, diesel::sql_types::SqlType)]
     #[diesel(postgres_type(name = "user_role"))]
     pub struct UserRole;
+
+    #[derive(diesel::query_builder::QueryId, diesel::sql_types::SqlType)]
+    #[diesel(postgres_type(name = "payment_type"))]
+    pub struct PaymentType;
+
+    #[derive(diesel::query_builder::QueryId, diesel::sql_types::SqlType)]
+    #[diesel(postgres_type(name = "inventory_status"))]
+    pub struct InventoryStatus;
 }
 
 diesel::table! {
@@ -66,6 +74,7 @@ diesel::table! {
         created_at -> Timestamptz,
         updated_at -> Timestamptz,
         price -> Numeric,
+        assigned_cleaner_id -> Nullable<Uuid>,
     }
 }
 
@@ -94,7 +103,78 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    use diesel::sql_types::*;
+    use super::sql_types::PaymentType;
+
+    payments (id) {
+        id -> Uuid,
+        booking_id -> Uuid,
+        amount -> Numeric,
+        payment_type -> PaymentType,
+        #[max_length = 50]
+        payment_method -> Varchar,
+        notes -> Nullable<Text>,
+        created_by_user_id -> Uuid,
+        created_at -> Timestamptz,
+        updated_at -> Timestamptz,
+    }
+}
+
+diesel::table! {
+    use diesel::sql_types::*;
+    use super::sql_types::InventoryStatus;
+
+    inventory_items (id) {
+        id -> Uuid,
+        #[max_length = 100]
+        name -> Varchar,
+        description -> Nullable<Text>,
+        quantity -> Int4,
+        price -> Numeric,
+        status -> InventoryStatus,
+        notes -> Nullable<Text>,
+        created_at -> Timestamptz,
+        updated_at -> Timestamptz,
+    }
+}
+
+diesel::table! {
+    messages (id) {
+        id -> Uuid,
+        sender_id -> Uuid,
+        receiver_id -> Uuid,
+        content -> Text,
+        image_url -> Nullable<Text>,
+        is_read -> Bool,
+        created_at -> Timestamptz,
+        updated_at -> Timestamptz,
+    }
+}
+
+diesel::table! {
+    system_settings (key) {
+        #[max_length = 50]
+        key -> Varchar,
+        value -> Text,
+        description -> Nullable<Text>,
+        updated_at -> Timestamptz,
+    }
+}
+
 diesel::joinable!(bookings -> rooms (room_id));
 diesel::joinable!(bookings -> users (created_by_user_id));
+diesel::joinable!(payments -> bookings (booking_id));
+diesel::joinable!(payments -> users (created_by_user_id));
+diesel::joinable!(rooms -> users (assigned_cleaner_id));
 
-diesel::allow_tables_to_appear_in_same_query!(bookings, guest_interaction_notes, rooms, users,);
+diesel::allow_tables_to_appear_in_same_query!(
+    bookings,
+    guest_interaction_notes,
+    inventory_items,
+    messages,
+    payments,
+    rooms,
+    users,
+    system_settings,
+);

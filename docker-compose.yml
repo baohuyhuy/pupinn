@@ -3,11 +3,12 @@ services:
     image: postgres:16-alpine
     container_name: pupinn_postgres
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-pupinn_db}
       POSTGRES_USER: ${POSTGRES_USER:-pupinn_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      LOAD_SEED_DATA: ${LOAD_SEED_DATA:-false}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backend/migrations:/migrations:ro
@@ -15,19 +16,113 @@ services:
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB && test -f /var/lib/postgresql/migrations_complete"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pupinn_user} -d ${POSTGRES_DB:-pupinn_db}"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 30s
     networks:
       - pupinn_network
 
+  minio:
+    image: minio/minio
+    container_name: pupinn_minio
+    env_file:
+      - .env
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_PROMETHEUS_AUTH_TYPE: public
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://minio:9000/minio/health/live" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - pupinn_network
+
+  minio-create-bucket:
+    image: minio/mc
+    depends_on:
+      - minio
+    env_file:
+      - .env
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        # Loop until connection is successful
+        until (/usr/bin/mc alias set myminio http://minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin}); do
+          echo 'MinIO not ready... waiting 5s...'
+          sleep 5
+        done
+
+        # Create bucket and set policy
+        /usr/bin/mc mb --ignore-existing myminio/chat-images
+        /usr/bin/mc anonymous set public myminio/chat-images
+
+        exit 0
+    networks:
+      - pupinn_network
+
+  backend:
+    build: 
+      context: .
+      dockerfile: ./backend/Dockerfile
+    image: magnusdtd/intro2se-backend
+    container_name: pupinn_backend
+    env_file:
+      - .env
+    ports:
+      - "8080:8080"
+    networks:
+      - pupinn_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-pupinn_user}:${POSTGRES_PASSWORD:-dev_password_123}@postgres:5432/${POSTGRES_DB:-pupinn_db}
+      - JWT_SECRET=${JWT_SECRET}
+      - ALLOWED_ORIGIN=${ALLOWED_ORIGIN:-http://localhost:3000}
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=8080
+      - MINIO_URL=${MINIO_URL:-http://minio:9000}
+      - MINIO_PUBLIC_URL=${MINIO_PUBLIC_URL:-http://localhost:9000}
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minioadmin}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minioadmin}
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: ./frontend/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080/api}
+    image: magnusdtd/intro2se-frontend
+    container_name: pupinn_frontend
+    env_file:
+      - .env
+    ports:
+      - "3000:3000"
+    networks:
+      - pupinn_network
+    depends_on:
+      - backend
+    restart: unless-stopped
+
 volumes:
   postgres_data:
+    driver: local
+  minio_data:
     driver: local
 
 networks:
   pupinn_network:
     driver: bridge
-

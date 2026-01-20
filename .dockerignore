@@ -1,0 +1,29 @@
+.dockerignore
+node_modules
+logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.next
+.git
+.env*
+data/
+.venv/
+target/
+backend/target/
+backend/**/target/
+frontend/.next
+frontend/node_modules
+frontend/dist
+frontend/build
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+# OS files
+.DS_Store
+Thumbs.db

@@ -116,6 +116,7 @@ impl RoomService {
         room_id: Uuid,
         room_type: Option<RoomType>,
         status: Option<RoomStatus>,
+        assigned_cleaner_id: Option<Option<Uuid>>,
     ) -> AppResult<Room> {
         let mut conn = self
             .pool
@@ -152,11 +153,17 @@ impl RoomService {
             }
         }
 
-        let update = UpdateRoom {
+        let mut update = UpdateRoom {
             room_type,
             status,
             price: None,
+            assigned_cleaner_id,
         };
+        
+        // Auto-clear assignment if becoming available
+        if status == Some(RoomStatus::Available) {
+            update.assigned_cleaner_id = Some(None);
+        }
 
         diesel::update(rooms::table.find(room_id))
             .set(&update)
@@ -169,6 +176,7 @@ impl RoomService {
     /// This bypasses the UI restriction that prevents editing an occupied room
     /// directly to available; that transition is allowed here as part of the
     /// controlled check-out flow.
+    #[allow(dead_code)]
     pub fn update_room_status(&self, room_id: Uuid, status: RoomStatus) -> AppResult<Room> {
         let mut conn = self
             .pool
@@ -186,9 +194,21 @@ impl RoomService {
                 current.status, status
             )));
         }
+        
+        let mut update = UpdateRoom {
+            room_type: None,
+            status: Some(status),
+            price: None,
+            assigned_cleaner_id: None,
+        };
+        
+        // Auto-clear assignment if becoming available
+        if status == RoomStatus::Available {
+            update.assigned_cleaner_id = Some(None);
+        }
 
         diesel::update(rooms::table.find(room_id))
-            .set(rooms::status.eq(status))
+            .set(&update)
             .get_result(&mut conn)
             .map_err(|e| AppError::DatabaseError(e.to_string()))
     }
