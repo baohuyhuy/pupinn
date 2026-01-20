@@ -89,32 +89,28 @@ sequenceDiagram
     participant AS as AuthService
     participant DB as Database
     
-    rect rgb(220, 240, 255)
-        Note over U,DB: Registration Flow
-        U->>F: Fill registration form
-        F->>Reg: POST /auth/register
-        Reg->>AS: register_guest(email, password, full_name)
-        AS->>AS: Hash password (Argon2id)
-        AS->>DB: INSERT user with role='guest'
-        DB-->>AS: New user ID
-        AS-->>Reg: Success
-        Reg-->>F: 201 Created
-    end
+    Note over U,DB: Registration Flow
+    U->>F: Fill registration form
+    F->>Reg: POST /auth/register
+    Reg->>AS: register_guest(email, password, full_name)
+    AS->>AS: Hash password (Argon2id)
+    AS->>DB: INSERT user with role='guest'
+    DB-->>AS: New user ID
+    AS-->>Reg: Success
+    Reg-->>F: 201 Created
     
-    rect rgb(255, 240, 220)
-        Note over U,DB: Login Flow
-        U->>F: Enter email & password
-        F->>Login: POST /auth/guest/login
-        Login->>AS: authenticate_guest(email, password)
-        AS->>DB: Query user by email
-        DB-->>AS: User record
-        AS->>AS: Verify password hash
-        AS->>AS: Generate JWT token
-        AS-->>Login: Return JWT + user info
-        Login-->>F: 200 OK with token
-        F->>F: Store token in localStorage
-        F->>U: Redirect to guest dashboard
-    end
+    Note over U,DB: Login Flow
+    U->>F: Enter email & password
+    F->>Login: POST /auth/guest/login
+    Login->>AS: authenticate_guest(email, password)
+    AS->>DB: Query user by email
+    DB-->>AS: User record
+    AS->>AS: Verify password hash
+    AS->>AS: Generate JWT token
+    AS-->>Login: Return JWT + user info
+    Login-->>F: 200 OK with token
+    F->>F: Store token in localStorage
+    F->>U: Redirect to guest dashboard
 ```
 
 ---
@@ -185,33 +181,29 @@ sequenceDiagram
     participant RS as RoomService
     participant DB as Database
     
-    rect rgb(220, 255, 220)
-        Note over S,DB: Check-in Flow
-        S->>F: Click "Check In" for booking
-        F->>API: POST /bookings/:id/check-in
-        API->>BS: check_in_booking(id)
-        BS->>DB: UPDATE booking status='checked_in'
-        BS->>RS: update_room_status(room_id, 'occupied')
-        RS->>DB: UPDATE room status='occupied'
-        DB-->>BS: Success
-        BS-->>API: Booking updated
-        API-->>F: 200 OK
-        F->>S: Show success notification
-    end
+    Note over S,DB: Check-in Flow
+    S->>F: Click "Check In" for booking
+    F->>API: POST /bookings/:id/check-in
+    API->>BS: check_in_booking(id)
+    BS->>DB: UPDATE booking status='checked_in'
+    BS->>RS: update_room_status(room_id, 'occupied')
+    RS->>DB: UPDATE room status='occupied'
+    DB-->>BS: Success
+    BS-->>API: Booking updated
+    API-->>F: 200 OK
+    F->>S: Show success notification
     
-    rect rgb(255, 220, 220)
-        Note over S,DB: Check-out Flow
-        S->>F: Click "Check Out" for booking
-        F->>API: POST /bookings/:id/check-out
-        API->>BS: check_out_booking(id)
-        BS->>DB: UPDATE booking status='checked_out'
-        BS->>RS: update_room_status(room_id, 'dirty')
-        RS->>DB: UPDATE room status='dirty'
-        DB-->>BS: Success
-        BS-->>API: Booking updated
-        API-->>F: 200 OK
-        F->>S: Show success notification<br/>(Room marked as Dirty)
-    end
+    Note over S,DB: Check-out Flow
+    S->>F: Click "Check Out" for booking
+    F->>API: POST /bookings/:id/check-out
+    API->>BS: check_out_booking(id)
+    BS->>DB: UPDATE booking status='checked_out'
+    BS->>RS: update_room_status(room_id, 'dirty')
+    RS->>DB: UPDATE room status='dirty'
+    DB-->>BS: Success
+    BS-->>API: Booking updated
+    API-->>F: 200 OK
+    F->>S: Show success notification<br/>(Room marked as Dirty)
 ```
 
 ---
@@ -234,45 +226,37 @@ sequenceDiagram
     UI->>WS: Send message via WebSocket
     WS->>AI: generate_reply(message, user_id)
     
-    rect rgb(240, 240, 255)
-        Note over AI: AI Agent Processing
-        AI->>AI: Analyze request
-        AI->>UI: "What are your check-in and check-out dates?"
-    end
+    Note over AI: AI Agent Processing
+    AI->>AI: Analyze request
+    AI->>UI: "What are your check-in and check-out dates?"
     
     G->>UI: "From 2026-02-20 to 2026-02-25"
     UI->>WS: Send dates
     WS->>AI: generate_reply(dates, user_id)
     
-    rect rgb(255, 250, 240)
-        Note over AI,DB: Tool: SearchRoomsTool
-        AI->>Tools: search_available_rooms(check_in, check_out, "double")
-        Tools->>DB: Query available rooms
-        DB-->>Tools: [Room 101: Double, 1,500,000 VND/night]
-        Tools-->>AI: Room results
-    end
+    Note over AI,DB: Tool: SearchRoomsTool
+    AI->>Tools: search_available_rooms(check_in, check_out, "double")
+    Tools->>DB: Query available rooms
+    DB-->>Tools: [Room 101: Double, 1,500,000 VND/night]
+    Tools-->>AI: Room results
     
     AI->>UI: "Found Room 101 (Double) for 1,500,000 VND/night"
     G->>UI: "Yes, create booking proposal"
     UI->>WS: Confirmation
     WS->>AI: generate_reply(confirmation, user_id)
     
-    rect rgb(240, 255, 240)
-        Note over AI,DB: Tool: CreateBookingProposalTool
-        AI->>Tools: create_booking_proposal(room_id, dates)
-        Tools->>DB: Validate room & dates
-        Tools->>Tools: Calculate total price
-        Tools-->>AI: BOOKING_PROPOSAL:{json}
-    end
+    Note over AI,DB: Tool: CreateBookingProposalTool
+    AI->>Tools: create_booking_proposal(room_id, dates)
+    Tools->>DB: Validate room & dates
+    Tools->>Tools: Calculate total price
+    Tools-->>AI: BOOKING_PROPOSAL:{json}
     
     AI->>WS: Return booking proposal
     WS->>UI: Send BOOKING_PROPOSAL message
     
-    rect rgb(255, 240, 255)
-        Note over UI: Frontend Renders Interactive Card
-        UI->>UI: Parse BOOKING_PROPOSAL
-        UI->>G: Display Booking Card with "Book Now" button
-    end
+    Note over UI: Frontend Renders Interactive Card
+    UI->>UI: Parse BOOKING_PROPOSAL
+    UI->>G: Display Booking Card with "Book Now" button
     
     G->>UI: Click "Book Now"
     UI->>BookAPI: POST /guest/bookings
@@ -335,63 +319,55 @@ sequenceDiagram
     participant AI as AI Service
     participant DB as Database
     
-    rect rgb(220, 240, 255)
-        Note over U,State: Connection Setup
-        U->>F: Open chat interface
-        F->>WS: WebSocket connection request
-        WS->>WS: Extract JWT from query param
-        WS->>WS: Verify & decode JWT
-        WS->>State: Register connection (user_id → socket)
-        State-->>WS: Connection registered
-        WS-->>F: WebSocket connected
+    Note over U,State: Connection Setup
+    U->>F: Open chat interface
+    F->>WS: WebSocket connection request
+    WS->>WS: Extract JWT from query param
+    WS->>WS: Verify & decode JWT
+    WS->>State: Register connection (user_id → socket)
+    State-->>WS: Connection registered
+    WS-->>F: WebSocket connected
+    
+    Note over U,DB: Send Message Flow
+    U->>F: Type message & send
+    F->>WS: WebSocket: text message
+    WS->>DB: INSERT message (sender, receiver, content)
+    DB-->>WS: Message saved
+    WS->>State: Get receiver's active connection
+    
+    alt Receiver is online
+        State-->>WS: Return receiver socket
+        WS->>F: Forward message to receiver (WebSocket)
+    else Receiver is offline
+        State-->>WS: No active connection
+        Note over WS: Message only stored in DB
     end
     
-    rect rgb(255, 250, 240)
-        Note over U,DB: Send Message Flow
-        U->>F: Type message & send
-        F->>WS: WebSocket: text message
-        WS->>DB: INSERT message (sender, receiver, content)
-        DB-->>WS: Message saved
-        WS->>State: Get receiver's active connection
-        
-        alt Receiver is online
-            State-->>WS: Return receiver socket
-            WS->>F: Forward message to receiver (WebSocket)
-        else Receiver is offline
-            State-->>WS: No active connection
-            Note over WS: Message only stored in DB
-        end
+    Note over U,AI: AI Bot Message Flow
+    U->>F: Send message to Pupinn bot
+    F->>WS: WebSocket: message to bot_id
+    WS->>DB: Save user message
+    WS->>AI: generate_reply(message, user_id)
+    
+    par Async AI Processing
+        AI->>AI: Process with agent & tools
+        AI-->>WS: AI response
     end
     
-    rect rgb(240, 255, 240)
-        Note over U,AI: AI Bot Message Flow
-        U->>F: Send message to Pupinn bot
-        F->>WS: WebSocket: message to bot_id
-        WS->>DB: Save user message
-        WS->>AI: generate_reply(message, user_id)
-        
-        par Async AI Processing
-            AI->>AI: Process with agent & tools
-            AI-->>WS: AI response
-        end
-        
-        WS->>DB: Save AI message
-        WS->>F: Send AI response via WebSocket
-        F->>U: Display AI message/booking card
-    end
+    WS->>DB: Save AI message
+    WS->>F: Send AI response via WebSocket
+    F->>U: Display AI message/booking card
     
-    rect rgb(255, 240, 240)
-        Note over U,State: Image Upload in Chat
-        U->>F: Select image to send
-        F->>WS: HTTP POST /api/chat/upload (multipart)
-        WS->>WS: Validate image (size, type)
-        WS->>Storage: Upload to MinIO
-        Storage-->>WS: Image URL
-        WS->>DB: INSERT message with image_url
-        WS->>State: Get receiver socket
-        State-->>WS: Receiver socket
-        WS->>F: Forward message with image
-    end
+    Note over U,State: Image Upload in Chat
+    U->>F: Select image to send
+    F->>WS: HTTP POST /api/chat/upload (multipart)
+    WS->>WS: Validate image (size, type)
+    WS->>Storage: Upload to MinIO
+    Storage-->>WS: Image URL
+    WS->>DB: INSERT message with image_url
+    WS->>State: Get receiver socket
+    State-->>WS: Receiver socket
+    WS->>F: Forward message with image
 ```
 
 ### Chat State Management
@@ -492,29 +468,25 @@ sequenceDiagram
     API-->>F: Room data
     F->>C: Display rooms with color coding<br/>(Red=Dirty, Yellow=Cleaning, Green=Available)
     
-    rect rgb(255, 240, 220)
-        Note over C,DB: Start Cleaning
-        C->>F: Click "Start Cleaning" on Room 101
-        F->>API: PATCH /rooms/:id {status: "cleaning"}
-        API->>RS: update_room_status(id, "cleaning")
-        RS->>DB: UPDATE room status='cleaning'
-        DB-->>RS: Success
-        RS-->>API: Room updated
-        API-->>F: 200 OK
-        F->>F: Update UI (room turns yellow)
-    end
+    Note over C,DB: Start Cleaning
+    C->>F: Click "Start Cleaning" on Room 101
+    F->>API: PATCH /rooms/:id {status: "cleaning"}
+    API->>RS: update_room_status(id, "cleaning")
+    RS->>DB: UPDATE room status='cleaning'
+    DB-->>RS: Success
+    RS-->>API: Room updated
+    API-->>F: 200 OK
+    F->>F: Update UI (room turns yellow)
     
-    rect rgb(220, 255, 220)
-        Note over C,DB: Complete Cleaning
-        C->>F: Click "Mark as Clean" on Room 101
-        F->>API: PATCH /rooms/:id {status: "available"}
-        API->>RS: update_room_status(id, "available")
-        RS->>DB: UPDATE room status='available'
-        DB-->>RS: Success
-        RS-->>API: Room updated
-        API-->>F: 200 OK
-        F->>F: Update UI (room turns green, removed from dashboard)
-    end
+    Note over C,DB: Complete Cleaning
+    C->>F: Click "Mark as Clean" on Room 101
+    F->>API: PATCH /rooms/:id {status: "available"}
+    API->>RS: update_room_status(id, "available")
+    RS->>DB: UPDATE room status='available'
+    DB-->>RS: Success
+    RS-->>API: Room updated
+    API-->>F: 200 OK
+    F->>F: Update UI (room turns green, removed from dashboard)
 ```
 
 ---
@@ -606,27 +578,23 @@ sequenceDiagram
     F->>F: Validate image (size, type)
     F->>API: POST /api/chat/upload (multipart/form-data)
     
-    rect rgb(240, 240, 255)
-        Note over API,MinIO: Upload to MinIO
-        API->>API: Extract file from multipart
-        API->>API: Validate file type & size
-        API->>SS: upload_image(file, filename)
-        SS->>SS: Generate unique filename (UUID)
-        SS->>MinIO: PUT object to bucket "chat-images"
-        MinIO-->>SS: Success
-        SS->>SS: Generate public URL
-        SS-->>API: Return image URL
-    end
+    Note over API,MinIO: Upload to MinIO
+    API->>API: Extract file from multipart
+    API->>API: Validate file type & size
+    API->>SS: upload_image(file, filename)
+    SS->>SS: Generate unique filename (UUID)
+    SS->>MinIO: PUT object to bucket "chat-images"
+    MinIO-->>SS: Success
+    SS->>SS: Generate public URL
+    SS-->>API: Return image URL
     
-    rect rgb(240, 255, 240)
-        Note over API,WS: Save Message with Image
-        API->>DB: INSERT message (sender, receiver, image_url)
-        DB-->>API: Message saved
-        API->>WS: Notify WebSocket handler
-        WS->>F: Send message with image_url via WebSocket
-        F->>F: Render image in chat
-        F->>U: Display image message
-    end
+    Note over API,WS: Save Message with Image
+    API->>DB: INSERT message (sender, receiver, image_url)
+    DB-->>API: Message saved
+    API->>WS: Notify WebSocket handler
+    WS->>F: Send message with image_url via WebSocket
+    F->>F: Render image in chat
+    F->>U: Display image message
     
     alt Upload Failed
         SS-->>API: Error
