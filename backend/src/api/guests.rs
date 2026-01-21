@@ -98,6 +98,20 @@ pub struct AddGuestNoteRequest {
 
 // ---------------- HANDLERS ----------------
 
+/// List all guest user accounts (role = guest)
+/// GET /admin/guests
+pub async fn list_guests(
+    State(state): State<AppState>,
+    Extension(_auth_user): Extension<AuthUser>,
+) -> Result<impl IntoResponse, AppError> {
+    let guest_service = GuestService::new(state.pool.clone());
+    let guests = guest_service.list_guests()?;
+
+    Ok(Json(GuestSearchResponse {
+        guests: guests.into_iter().map(GuestResponse::from).collect(),
+    }))
+}
+
 /// Search for guests
 /// GET /admin/guests/search?q=query
 pub async fn search_guests(

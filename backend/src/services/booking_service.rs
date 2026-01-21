@@ -601,7 +601,7 @@ impl BookingService {
     }
 
     /// Check in a guest
-    pub fn check_in(&self, booking_id: Uuid, confirm_early: bool) -> AppResult<Booking> {
+    pub fn check_in(&self, booking_id: Uuid) -> AppResult<Booking> {
         let mut conn = self
             .pool
             .get()
@@ -628,42 +628,14 @@ impl BookingService {
             }
 
             let today = Utc::now().date_naive();
-            let actual_check_in_date = if booking.check_in_date > today && confirm_early {
-                today  // Early check-in: use today instead of original check-in date
-            } else {
-                booking.check_in_date
-            };
-
-            if booking.check_in_date > today && !confirm_early {
+            
+            // Only allow check-in on the actual check-in date
+            if booking.check_in_date != today {
                 return Err(app_error_to_diesel(AppError::ValidationError(format!(
-                    "Check-in date is {}. Confirm early check-in to proceed.",
-                    booking.check_in_date
+                    "Check-in is only allowed on the check-in date ({}). Today is {}.",
+                    booking.check_in_date,
+                    today
                 ))));
-            }
-
-            // For early check-in, validate room availability on the actual check-in date
-            if actual_check_in_date < booking.check_in_date {
-                // Check if room is available for the early check-in date
-                let conflicting: Vec<Booking> = bookings::table
-                    .filter(bookings::room_id.eq(booking.room_id))
-                    .filter(bookings::id.ne(booking_id))
-                    .filter(bookings::status.ne(BookingStatus::Cancelled))
-                    .filter(bookings::status.ne(BookingStatus::CheckedOut))
-                    .filter(bookings::check_in_date.lt(booking.check_out_date))
-                    .filter(bookings::check_out_date.gt(actual_check_in_date))
-                    .load(conn)
-                    .map_err(|e| diesel::result::Error::DatabaseError(
-                        diesel::result::DatabaseErrorKind::CheckViolation,
-                        Box::new(StringError(format!("Failed to check availability: {}", e))) as Box<dyn DatabaseErrorInformation + Send + Sync>,
-                    ))?;
-
-                if !conflicting.is_empty() {
-                    return Err(app_error_to_diesel(AppError::RoomUnavailable(format!(
-                        "Room is not available for early check-in on {}. Another booking is active until {}.",
-                        actual_check_in_date,
-                        conflicting[0].check_out_date
-                    ))));
-                }
             }
 
             let current_room: Room = rooms::table
@@ -677,8 +649,8 @@ impl BookingService {
                 )));
             }
 
-            // For early check-in on the actual date, also check if room is currently occupied
-            if actual_check_in_date == today && current_room.status == RoomStatus::Occupied {
+            // Check if room is currently occupied
+            if current_room.status == RoomStatus::Occupied {
                 // Check if there's an active booking that's still checked in
                 let active_booking: Option<Booking> = bookings::table
                     .filter(bookings::room_id.eq(booking.room_id))
@@ -701,29 +673,14 @@ impl BookingService {
                 }
             }
 
-            // Update booking status and check-in date if doing early check-in
-            let rows_updated = if actual_check_in_date < booking.check_in_date {
-                // Early check-in: update both status and check-in date
-                diesel::update(
-                    bookings::table
-                        .find(booking_id)
-                        .filter(bookings::status.eq(booking.status)),
-                )
-                .set((
-                    bookings::status.eq(BookingStatus::CheckedIn),
-                    bookings::check_in_date.eq(actual_check_in_date),
-                ))
-                .execute(conn)?
-            } else {
-                // Normal check-in: only update status
-                diesel::update(
-                    bookings::table
-                        .find(booking_id)
-                        .filter(bookings::status.eq(booking.status)),
-                )
-                .set(bookings::status.eq(BookingStatus::CheckedIn))
-                .execute(conn)?
-            };
+            // Normal check-in: only update status
+            let rows_updated = diesel::update(
+                bookings::table
+                    .find(booking_id)
+                    .filter(bookings::status.eq(booking.status)),
+            )
+            .set(bookings::status.eq(BookingStatus::CheckedIn))
+            .execute(conn)?;
 
             if rows_updated == 0 {
                 return Err(app_error_to_diesel(AppError::Conflict(

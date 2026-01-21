@@ -33,11 +33,10 @@ pub struct UpdateBookingDto {
     pub check_out_date: Option<NaiveDate>,
 }
 
-/// Check-in request DTO
+/// Check-in request DTO (no parameters needed - check-in only allowed on check-in date)
 #[derive(Debug, Deserialize)]
 pub struct CheckInDto {
-    #[serde(default)]
-    pub confirm_early: bool,
+    // Empty struct - check-in is only allowed on the actual check-in date
 }
 
 /// Query parameters for listing bookings
@@ -154,10 +153,10 @@ pub async fn update_booking(
 pub async fn check_in(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
-    Json(payload): Json<CheckInDto>,
+    _payload: Json<CheckInDto>,
 ) -> Result<impl IntoResponse, AppError> {
     let booking_service = BookingService::new(state.pool);
-    let booking = booking_service.check_in(id, payload.confirm_early)?;
+    let booking = booking_service.check_in(id)?;
     Ok((StatusCode::OK, Json(booking)))
 }
 

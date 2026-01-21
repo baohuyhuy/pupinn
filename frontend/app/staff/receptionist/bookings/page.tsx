@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
+import { format } from "date-fns";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -44,8 +45,7 @@ export default function ReceptionistBookingsPage() {
   const [checkInDialog, setCheckInDialog] = useState<{
     open: boolean;
     bookingId: string | null;
-    isEarly: boolean;
-  }>({ open: false, bookingId: null, isEarly: false });
+  }>({ open: false, bookingId: null });
   const [checkOutDialog, setCheckOutDialog] = useState<{
     open: boolean;
     bookingId: string | null;
@@ -90,16 +90,8 @@ export default function ReceptionistBookingsPage() {
   });
 
   const checkInMutation = useMutation({
-    mutationFn: async ({
-      bookingId,
-      confirmEarly,
-    }: {
-      bookingId: string;
-      confirmEarly: boolean;
-    }) => {
-      const response = await apiClient.post(`/bookings/${bookingId}/check-in`, {
-        confirm_early: confirmEarly,
-      });
+    mutationFn: async (bookingId: string) => {
+      const response = await apiClient.post(`/bookings/${bookingId}/check-in`, {});
       return response.data;
     },
     onSuccess: () => {
@@ -119,7 +111,7 @@ export default function ReceptionistBookingsPage() {
         title: "Check-in Successful",
         description: "Guest has been checked in and payment recorded.",
       });
-      setCheckInDialog({ open: false, bookingId: null, isEarly: false });
+      setCheckInDialog({ open: false, bookingId: null });
     },
     onError: (error: Error) => {
       const message = getErrorMessage(error);
@@ -198,7 +190,7 @@ export default function ReceptionistBookingsPage() {
   });
 
   const handleCheckIn = (bookingId: string) => {
-    // Check if this is an early check-in by comparing check-in date with today
+    // Check if check-in is allowed (must be on check-in date)
     const booking = bookings?.find((b) => b.id === bookingId);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -206,9 +198,18 @@ export default function ReceptionistBookingsPage() {
     if (checkInDate) {
       checkInDate.setHours(0, 0, 0, 0);
     }
-    const isEarly = checkInDate && checkInDate > today;
     
-    setCheckInDialog({ open: true, bookingId, isEarly: isEarly || false });
+    // Validate that check-in date is today
+    if (checkInDate && checkInDate.getTime() !== today.getTime()) {
+      toast({
+        title: "Check-in Not Allowed",
+        description: `Check-in is only allowed on the check-in date (${format(checkInDate, "MMM d, yyyy")}). Today is ${format(today, "MMM d, yyyy")}.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setCheckInDialog({ open: true, bookingId });
   };
 
   const handleCheckOut = (bookingId: string) => {
@@ -223,10 +224,7 @@ export default function ReceptionistBookingsPage() {
     if (!checkInDialog.bookingId) return;
     
     // Payment is already created in the dialog, just proceed with check-in
-    checkInMutation.mutate({
-      bookingId: checkInDialog.bookingId,
-      confirmEarly: checkInDialog.isEarly,
-    });
+    checkInMutation.mutate(checkInDialog.bookingId);
   };
 
   const confirmCheckOut = () => {
@@ -290,9 +288,9 @@ export default function ReceptionistBookingsPage() {
       <CheckInPaymentDialog
         open={checkInDialog.open}
         bookingId={checkInDialog.bookingId}
-        isEarly={checkInDialog.isEarly}
+        isEarly={false}
         onOpenChange={(open) =>
-          setCheckInDialog({ open, bookingId: null, isEarly: false })
+          setCheckInDialog({ open, bookingId: null })
         }
         onConfirm={handleCheckInConfirm}
       />
