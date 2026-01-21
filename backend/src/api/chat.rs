@@ -282,15 +282,23 @@ async fn handle_socket(
     
     let mut rx = tx.subscribe();
 
-    // Fetch user name for AI context
+    // Verify user exists and fetch user name for AI context
     let user_name = {
-        let mut conn = get_conn(&state.pool).expect("Failed to get DB connection");
-        users::table
-            .find(my_id)
-            .first::<User>(&mut conn)
-            .ok()
-            .and_then(|u| u.username.or(u.full_name))
-            .unwrap_or_else(|| "User".to_string())
+        let mut conn = match get_conn(&state.pool) {
+            Ok(conn) => conn,
+            Err(e) => {
+                tracing::error!("Failed to get DB connection: {}", e);
+                return;
+            }
+        };
+        
+        match users::table.find(my_id).first::<User>(&mut conn) {
+            Ok(user) => user.username.or(user.full_name).unwrap_or_else(|| "User".to_string()),
+            Err(e) => {
+                tracing::error!("User {} not found in database: {}", my_id, e);
+                return;
+            }
+        }
     };
     let user_name = Arc::new(user_name);
     
@@ -315,7 +323,13 @@ async fn handle_socket(
                         // Check if receiver is Pupinn (The Bot)
                         if incoming.receiver_id == PUPINN_ID {
                             // 1. Save user message to DB
-                            let mut conn = get_conn(&state.pool).expect("DB Pool Error");
+                            let mut conn = match get_conn(&state.pool) {
+                                Ok(conn) => conn,
+                                Err(e) => {
+                                    tracing::error!("Failed to get DB connection: {}", e);
+                                    continue;
+                                }
+                            };
                             
                             let user_message = NewMessage {
                                 sender_id: my_id,
@@ -324,10 +338,16 @@ async fn handle_socket(
                                 image_url: incoming.image_url.clone(),
                             };
 
-                            let _saved_msg: Message = diesel::insert_into(messages::table)
+                            let _saved_msg: Message = match diesel::insert_into(messages::table)
                                 .values(&user_message)
                                 .get_result(&mut conn)
-                                .expect("Failed to save msg");
+                            {
+                                Ok(msg) => msg,
+                                Err(e) => {
+                                    tracing::error!("Failed to save message: {}", e);
+                                    continue;
+                                }
+                            };
 
                             // 2. Trigger AI Response (Async)
                             let ai_service = AiService::new(state.pool.clone());
@@ -339,7 +359,13 @@ async fn handle_socket(
                                 let reply_content = ai_service.generate_reply(my_id, &name_clone, &content_clone).await;
                                 
                                 if let Some(reply) = reply_content {
-                                    let mut conn = get_conn(&state_clone.pool).expect("DB Pool Error");
+                                    let mut conn = match get_conn(&state_clone.pool) {
+                                        Ok(conn) => conn,
+                                        Err(e) => {
+                                            tracing::error!("Failed to get DB connection in AI reply handler: {}", e);
+                                            return;
+                                        }
+                                    };
                                     
                                     // Check if the reply contains a BOOKING_PROPOSAL
                                     if let Some(proposal_start) = reply.find("BOOKING_PROPOSAL:") {
@@ -420,10 +446,16 @@ async fn handle_socket(
                                             image_url: None,
                                         };
                                         
-                                        let saved_bot_msg: Message = diesel::insert_into(messages::table)
+                                        let saved_bot_msg: Message = match diesel::insert_into(messages::table)
                                             .values(&bot_msg)
                                             .get_result(&mut conn)
-                                            .expect("Failed to save bot msg");
+                                        {
+                                            Ok(msg) => msg,
+                                            Err(e) => {
+                                                tracing::error!("Failed to save bot message: {}", e);
+                                                return;
+                                            }
+                                        };
                                         
                                         // Notify User
                                         let connections = state_clone.chat_state.active_connections.lock().unwrap();
@@ -445,7 +477,13 @@ async fn handle_socket(
 
                         } else {
                             // Standard P2P Chat Logic
-                            let mut conn = get_conn(&state.pool).expect("Failed to get DB conn");
+                            let mut conn = match get_conn(&state.pool) {
+                                Ok(conn) => conn,
+                                Err(e) => {
+                                    tracing::error!("Failed to get DB connection: {}", e);
+                                    continue;
+                                }
+                            };
                             
                             let receiver_user: Option<User> = users::table
                                 .find(incoming.receiver_id)

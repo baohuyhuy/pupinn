@@ -17,6 +17,7 @@ import {
   Package,
   MessageCircle,
   Settings,
+  KeyRound,
 } from "lucide-react";
 
 import {
@@ -42,7 +43,7 @@ const NAVIGATION = [
       { title: "Dashboard", href: "/dashboard", icon: Home },
       { title: "Bookings", href: "/bookings", icon: CalendarDays },
       { title: "Rooms", href: "/rooms", icon: BedDouble },
-      { title: "Chat", href: "/chat", icon: MessageCircle },
+      { title: "Chat", href: "/staff/admin/chat", icon: MessageCircle },
     ],
   },
   {
@@ -81,7 +82,7 @@ const ADMIN_NAVIGATION = [
       { title: "Financial", href: "/staff/admin/financial", icon: NotebookPen },
       { title: "Guests", href: "/staff/admin/guests", icon: UserPlus },
       { title: "Inventory", href: "/staff/admin/inventory", icon: Package },
-      { title: "Chat", href: "/chat", icon: MessageCircle },
+      { title: "Chat", href: "/staff/admin/chat", icon: MessageCircle },
       { title: "Settings", href: "/staff/admin/settings", icon: Settings },
     ],
   },
@@ -264,7 +265,18 @@ export function AppSidebar() {
         {isAuthenticated ? (
           <>
             {isCollapsed ? (
-              <div className="flex justify-center">
+              <div className="flex justify-center gap-2">
+                <Button
+                  asChild
+                  variant="ghost"
+                  size="icon"
+                  className="h-10 w-10 rounded-full border border-white/10 bg-white/10 text-white hover:bg-white/20 cursor-pointer"
+                  title="Change password"
+                >
+                  <Link href="/staff/change-password">
+                    <KeyRound className="h-4 w-4" />
+                  </Link>
+                </Button>
                 <Button
                   onClick={logout}
                   variant="ghost"
@@ -298,15 +310,28 @@ export function AppSidebar() {
                     </p>
                   </div>
                 </div>
-                <Button
-                  onClick={logout}
-                  variant="ghost"
-                  size="sm"
-                  className="mt-3 w-full justify-center gap-2 border border-white/10 bg-white/5 text-white hover:bg-white/10 cursor-pointer"
-                >
-                  <LogOut className="h-4 w-4" />
-                  <span>Sign out</span>
-                </Button>
+                <div className="space-y-2 mt-3">
+                  <Button
+                    asChild
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-center gap-2 border border-white/10 bg-white/5 text-white hover:bg-white/10 cursor-pointer"
+                  >
+                    <Link href="/staff/change-password">
+                      <KeyRound className="h-4 w-4" />
+                      <span>Change Password</span>
+                    </Link>
+                  </Button>
+                  <Button
+                    onClick={logout}
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-center gap-2 border border-white/10 bg-white/5 text-white hover:bg-white/10 cursor-pointer"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    <span>Sign out</span>
+                  </Button>
+                </div>
               </div>
             )}
           </>

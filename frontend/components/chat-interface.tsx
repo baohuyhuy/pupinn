@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Send, Image as ImageIcon, MessageCircle, Loader2, Check, X, Calendar } from "lucide-react";
+import { Send, Image as ImageIcon, MessageCircle, Loader2, Check, X, Calendar, ArrowLeft } from "lucide-react";
 import { format } from "date-fns";
 import { apiClient } from "@/lib/api-client";
 import { useRouter } from "next/navigation";
@@ -426,8 +426,27 @@ export function ChatInterface({ currentUser, token }: ChatInterfaceProps) {
         {activeContact ? (
           <>
             {/* Header */}
-            <div className="h-16 border-b border-white/10 flex items-center px-6 sticky top-0 bg-slate-950/80 backdrop-blur-md z-10">
+            <div className="h-16 border-b border-white/10 flex items-center justify-between px-6 sticky top-0 bg-slate-950/80 backdrop-blur-md z-10">
               <div className="flex items-center gap-3">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
+                    // Navigate back based on user role
+                    if (currentUser.role === 'admin') {
+                      router.push('/staff/admin/dashboard');
+                    } else if (currentUser.role === 'receptionist') {
+                      router.push('/staff/receptionist/dashboard');
+                    } else if (currentUser.role === 'cleaner') {
+                      router.push('/staff/cleaner/dashboard');
+                    } else {
+                      router.back();
+                    }
+                  }}
+                  className="h-9 w-9 rounded-full text-slate-400 hover:text-amber-300 hover:bg-amber-500/10"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
                 <div className="w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-300 font-medium">
                   {activeContact.name[0].toUpperCase()}
                 </div>
@@ -564,6 +583,27 @@ export function ChatInterface({ currentUser, token }: ChatInterfaceProps) {
         ) : (
           /* Empty State */
           <div className="flex-1 flex items-center justify-center text-slate-400 flex-col gap-4">
+            <div className="absolute top-4 left-4">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => {
+                  // Navigate back based on user role
+                  if (currentUser.role === 'admin') {
+                    router.push('/staff/admin/dashboard');
+                  } else if (currentUser.role === 'receptionist') {
+                    router.push('/staff/receptionist/dashboard');
+                  } else if (currentUser.role === 'cleaner') {
+                    router.push('/staff/cleaner/dashboard');
+                  } else {
+                    router.back();
+                  }
+                }}
+                className="h-9 w-9 rounded-full text-slate-400 hover:text-amber-300 hover:bg-amber-500/10"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            </div>
             <div className="w-16 h-16 rounded-3xl bg-slate-900/50 flex items-center justify-center border border-white/10">
               <MessageCircle className="w-8 h-8 opacity-40" />
             </div>

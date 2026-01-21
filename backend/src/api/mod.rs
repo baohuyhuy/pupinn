@@ -202,6 +202,7 @@ pub fn create_router(state: AppState) -> Router {
 
     // Admin guest CRM routes (requires admin auth)
     let admin_guest_routes = Router::new()
+        .route("/guests", get(guests::list_guests))
         .route("/guests/search", get(guests::search_guests))
         .route("/guests/:guestId", get(guests::get_guest_profile).patch(guests::update_guest))
         .route("/guests/:guestId/notes", get(guests::get_guest_notes).post(guests::add_guest_note))

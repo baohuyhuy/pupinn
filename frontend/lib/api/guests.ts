@@ -19,6 +19,14 @@ export async function searchGuests(query: string): Promise<GuestSearchResponse> 
 }
 
 /**
+ * List all guests (guest user accounts)
+ */
+export async function listGuests(): Promise<GuestSearchResponse> {
+  const response = await apiClient.get<GuestSearchResponse>("/admin/guests");
+  return response.data;
+}
+
+/**
  * Get full guest profile with PII and booking history
  */
 export async function getGuestProfile(guestId: string): Promise<GuestProfileResponse> {

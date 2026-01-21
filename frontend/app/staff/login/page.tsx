@@ -73,12 +73,12 @@ export default function StaffLoginPage() {
 
             <div className="space-y-2">
               <Label htmlFor="username" className="text-slate-300">
-                Username
+                Login
               </Label>
               <Input
                 id="username"
                 type="text"
-                placeholder="Enter your username"
+                placeholder="Enter your login"
                 className="bg-slate-700/50 border-slate-600 text-slate-100 placeholder:text-slate-500 focus:border-blue-500 focus:ring-blue-500/20"
                 {...register("username")}
               />

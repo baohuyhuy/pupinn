@@ -27,10 +27,26 @@ export function GuestSearch({ onSelectGuest }: GuestSearchProps) {
   const [results, setResults] = useState<GuestResponse[]>([]);
   const [error, setError] = useState<string | null>(null);
 
+  const loadAllGuests = useCallback(async () => {
+    setIsSearching(true);
+    setError(null);
+    try {
+      const { listGuests } = await import("@/lib/api/guests");
+      const response = await listGuests();
+      setResults(response.guests);
+      setError(null);
+    } catch (err: unknown) {
+      setError("Failed to load guests. Please try again.");
+      console.error("Load guests error:", err);
+      setResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  }, []);
+
   const performSearch = useCallback(async (query: string) => {
     if (!query.trim()) {
-      setResults([]);
-      setError(null);
+      await loadAllGuests();
       return;
     }
 
@@ -55,23 +71,22 @@ export function GuestSearch({ onSelectGuest }: GuestSearchProps) {
     }
   }, []);
 
-  // Debounced search as user types (prefix matching)
+  // Debounced search as user types (substring matching)
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       if (searchQuery.trim().length >= 2) {
         performSearch(searchQuery.trim());
       } else if (searchQuery.trim().length === 0) {
-        setResults([]);
-        setError(null);
+        loadAllGuests();
       }
     }, 300); // 300ms debounce
 
     return () => clearTimeout(timeoutId);
-  }, [searchQuery, performSearch]);
+  }, [searchQuery, performSearch, loadAllGuests]);
 
   const handleSearch = () => {
     if (!searchQuery.trim()) {
-      setError("Please enter a search query");
+      loadAllGuests();
       return;
     }
     performSearch(searchQuery.trim());
@@ -93,7 +108,7 @@ export function GuestSearch({ onSelectGuest }: GuestSearchProps) {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
               <Input
                 type="text"
-                placeholder="Type to search by prefix (name, email, phone, ID number, or booking reference)..."
+                placeholder="Search guests (name, email, phone, ID number, or booking reference). Leave empty to show all..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyPress={handleKeyPress}
@@ -120,7 +135,7 @@ export function GuestSearch({ onSelectGuest }: GuestSearchProps) {
           {results.length > 0 && (
             <div className="mt-4">
               <h3 className="text-lg font-semibold text-slate-100 mb-3">
-                Search Results ({results.length})
+                {searchQuery.trim() ? "Search Results" : "All Guests"} ({results.length})
               </h3>
               <Table>
                 <TableHeader>
