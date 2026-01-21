@@ -117,6 +117,59 @@ BEGIN
     RAISE NOTICE '  ⊘ Guest user already exists, skipping';
   END IF;
 
+  -- Additional guest users (for Admin Guest CRM demo)
+  -- All use password "guest123" (same hash as above) for convenience.
+  IF NOT EXISTS (SELECT 1 FROM users WHERE email = 'tiendat@example.com') THEN
+    INSERT INTO users (id, username, email, role, password_hash, full_name, created_at, updated_at)
+    VALUES (
+      '00000000-0000-0000-0000-000000000007'::uuid,
+      NULL,
+      'tiendat@example.com',
+      'guest',
+      '$argon2id$v=19$m=19456,t=2,p=1$8iHuB7fiS94sUBRjkTJahA$+TImWRzVe4flgmWQxgZ0TwDB9u7XOH4P6p1Wx5XSCbc',
+      'Tien-Dat Do',
+      NOW(),
+      NOW()
+    );
+    RAISE NOTICE '  ✓ Inserted guest user (email: tiendat@example.com, password: guest123)';
+  ELSE
+    RAISE NOTICE '  ⊘ Guest user tiendat@example.com already exists, skipping';
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM users WHERE email = 'anna.nguyen@example.com') THEN
+    INSERT INTO users (id, username, email, role, password_hash, full_name, created_at, updated_at)
+    VALUES (
+      '00000000-0000-0000-0000-000000000008'::uuid,
+      NULL,
+      'anna.nguyen@example.com',
+      'guest',
+      '$argon2id$v=19$m=19456,t=2,p=1$8iHuB7fiS94sUBRjkTJahA$+TImWRzVe4flgmWQxgZ0TwDB9u7XOH4P6p1Wx5XSCbc',
+      'Anna Nguyen',
+      NOW(),
+      NOW()
+    );
+    RAISE NOTICE '  ✓ Inserted guest user (email: anna.nguyen@example.com, password: guest123)';
+  ELSE
+    RAISE NOTICE '  ⊘ Guest user anna.nguyen@example.com already exists, skipping';
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM users WHERE email = 'minh.tran@example.com') THEN
+    INSERT INTO users (id, username, email, role, password_hash, full_name, created_at, updated_at)
+    VALUES (
+      '00000000-0000-0000-0000-000000000009'::uuid,
+      NULL,
+      'minh.tran@example.com',
+      'guest',
+      '$argon2id$v=19$m=19456,t=2,p=1$8iHuB7fiS94sUBRjkTJahA$+TImWRzVe4flgmWQxgZ0TwDB9u7XOH4P6p1Wx5XSCbc',
+      'Minh Tran',
+      NOW(),
+      NOW()
+    );
+    RAISE NOTICE '  ✓ Inserted guest user (email: minh.tran@example.com, password: guest123)';
+  ELSE
+    RAISE NOTICE '  ⊘ Guest user minh.tran@example.com already exists, skipping';
+  END IF;
+
   RAISE NOTICE 'User seed data complete!';
 END $$;
 

@@ -11,8 +11,19 @@ BEGIN
   UPDATE bookings SET guest_name = 'Bao-Huy Pham' WHERE reference = 'SEED-001';
   UPDATE bookings SET guest_name = 'Tien-Dat Do' WHERE reference = 'SEED-002';
   UPDATE bookings SET guest_name = 'Tien-Dat Dam' WHERE reference = 'SEED-003';
-  UPDATE bookings SET guest_name = 'Quang-De Tran' WHERE reference = 'SEED-004';
-  UPDATE bookings SET guest_name = 'Xuan-Dung Nguyen' WHERE reference = 'SEED-005';
+  -- Keep booking guest identities synchronized with seeded guest users:
+  -- tiendat@example.com  -> 00000000-0000-0000-0000-000000000007 (Tien-Dat Do)
+  -- anna.nguyen@example.com -> 00000000-0000-0000-0000-000000000008 (Anna Nguyen)
+  UPDATE bookings
+    SET guest_name = 'Tien-Dat Do',
+        created_by_user_id = '00000000-0000-0000-0000-000000000007'::uuid,
+        creation_source = 'guest'
+    WHERE reference = 'SEED-004';
+  UPDATE bookings
+    SET guest_name = 'Anna Nguyen',
+        created_by_user_id = '00000000-0000-0000-0000-000000000008'::uuid,
+        creation_source = 'guest'
+    WHERE reference = 'SEED-005';
   UPDATE bookings SET guest_name = 'Minh-Tuan Nguyen-Ngoc' WHERE reference = 'SEED-006';
   UPDATE bookings SET guest_name = 'Thanh-Trinh Nguyen' WHERE reference = 'SEED-007';
   UPDATE bookings SET guest_name = 'Van-Anh Le' WHERE reference = 'SEED-008';
@@ -94,12 +105,12 @@ BEGIN
     ) VALUES (
       '20000000-0000-0000-0000-000000000004'::uuid,
       'SEED-004',
-      'Quang-De Tran',
+      'Tien-Dat Do',
       '10000000-0000-0000-0000-000000000101'::uuid,  -- Room 101 (available)
       CURRENT_DATE + INTERVAL '3 days',
       CURRENT_DATE + INTERVAL '6 days',
       'upcoming',
-      '00000000-0000-0000-0000-000000000003'::uuid,  -- Guest user
+      '00000000-0000-0000-0000-000000000007'::uuid,  -- Guest: Tien-Dat Do
       'guest',
       (SELECT price FROM rooms WHERE id = '10000000-0000-0000-0000-000000000101'::uuid) * ((CURRENT_DATE + INTERVAL '6 days')::date - (CURRENT_DATE + INTERVAL '3 days')::date),
       NOW(),
@@ -113,12 +124,12 @@ BEGIN
     ) VALUES (
       '20000000-0000-0000-0000-000000000005'::uuid,
       'SEED-005',
-      'Xuan-Dung Nguyen',
+      'Anna Nguyen',
       '10000000-0000-0000-0000-000000000301'::uuid,  -- Room 301 (available)
       CURRENT_DATE + INTERVAL '10 days',
       CURRENT_DATE + INTERVAL '14 days',
       'upcoming',
-      '00000000-0000-0000-0000-000000000003'::uuid,  -- Guest user
+      '00000000-0000-0000-0000-000000000008'::uuid,  -- Guest: Anna Nguyen
       'guest',
       (SELECT price FROM rooms WHERE id = '10000000-0000-0000-0000-000000000301'::uuid) * ((CURRENT_DATE + INTERVAL '14 days')::date - (CURRENT_DATE + INTERVAL '10 days')::date),
       NOW(),
@@ -340,6 +351,27 @@ BEGIN
       (SELECT price FROM rooms WHERE id = '10000000-0000-0000-0000-000000000302'::uuid) * 3,
       NOW() - INTERVAL '29 days',
       NOW() - INTERVAL '25 days'
+    );
+  END IF;
+
+  -- Booking 16: Upcoming booking by guest (Minh Tran) to keep guest CRM + bookings in sync
+  IF NOT EXISTS (SELECT 1 FROM bookings WHERE reference = 'SEED-016') THEN
+    INSERT INTO bookings (
+      id, reference, guest_name, room_id, check_in_date, check_out_date,
+      status, created_by_user_id, creation_source, price, created_at, updated_at
+    ) VALUES (
+      '20000000-0000-0000-0000-000000000016'::uuid,
+      'SEED-016',
+      'Minh Tran',
+      '10000000-0000-0000-0000-000000000401'::uuid,  -- Room 401
+      CURRENT_DATE + INTERVAL '1 day',
+      CURRENT_DATE + INTERVAL '3 days',
+      'upcoming',
+      '00000000-0000-0000-0000-000000000009'::uuid,  -- Guest: Minh Tran
+      'guest',
+      (SELECT price FROM rooms WHERE id = '10000000-0000-0000-0000-000000000401'::uuid) * 2,
+      NOW(),
+      NOW()
     );
   END IF;
   
